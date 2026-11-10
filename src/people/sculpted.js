@@ -143,6 +143,9 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
     group: root,
     // the rifle muzzle in the world (from the last update), for tracers; null if unarmed
     muzzle(out) { return flash ? flash.getWorldPosition(out) : null; },
+    // the laser sight's beam: its start and direction in the world, and how far it reaches (stops on walls)
+    laserRay(from, dir) { if (!laser || !laser.visible) return false; laser.getWorldPosition(from); dir.set(0, 0, 1).transformDirection(laser.matrixWorld); return true; },
+    laserLength(m) { if (laser) laser.scale.z = Math.max(0.05, m) / 16; },
     update(t, dt, { phase, stride = 0, aim = 0, lean = 0, panic = 0, fireT = 9, flail = 0, fall = 0, idle = null }) {
       const s = Math.sin(phase), cph = Math.cos(phase), k = stride;
       // hips: bob at each footfall, twist with the stride; the chest counter-twists

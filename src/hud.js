@@ -34,15 +34,23 @@ export class Hud {
     document.head.appendChild(css);
     this.el = document.createElement('div');
     this.el.id = 'stat';
-    this.el.innerHTML = 'SPECIMEN 9<div class="bar"><div class="fill"></div></div><span class="k">0</span> CONSUMED';
+    this.el.innerHTML = 'SPECIMEN 9<div class="bar"><div class="fill"></div></div><span class="k">0</span> CONSUMED<div class="lk"></div>';
     document.body.appendChild(this.el);
-    this.fill = this.el.querySelector('.fill'); this.k = this.el.querySelector('.k');
+    this.fill = this.el.querySelector('.fill'); this.k = this.el.querySelector('.k'); this.lk = this.el.querySelector('.lk');
+    this.note = document.createElement('div');
+    this.note.style.cssText = 'position:fixed;left:0;right:0;top:22%;text-align:center;color:#f2ead8;font:600 26px ui-monospace,Consolas,monospace;letter-spacing:0.35em;text-shadow:0 2px 8px #000;pointer-events:none;opacity:0;transition:opacity 0.6s';
+    document.body.appendChild(this.note);
     this.slotsEl = document.createElement('div'); this.slotsEl.id = 'slots'; document.body.appendChild(this.slotsEl);
     this.choiceEl = document.createElement('div'); this.choiceEl.id = 'choice'; document.body.appendChild(this.choiceEl);
     this.over = document.createElement('div');
     this.over.id = 'over';
     document.body.appendChild(this.over);
   }
+  locks(done, total, open) {
+    const t = total ? (open ? 'EXIT OPEN: GET OUT' : `LOCKS ${done} / ${total}`) : '';
+    if (t !== this._lk) { this.lk.textContent = t; this.lk.style.color = open ? '#9fe38a' : '#e0b25a'; this.lk.style.marginTop = '6px'; this._lk = t; }
+  }
+  notice(text) { this.note.textContent = text; this.note.style.opacity = 1; clearTimeout(this._nt); this._nt = setTimeout(() => (this.note.style.opacity = 0), 3200); }
   set(hp, kills) { this.fill.style.width = `${Math.max(0, hp)}%`; this.k.textContent = kills; }
   // the six body slots: key, mutation (or empty), cooldown bar
   slots(list) {

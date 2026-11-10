@@ -57,6 +57,16 @@ export function makeLabLayout(seed = 1337) {
   add('paint', { x0: 11.5, z0: -12.7, x1: 30.5, z1: -12.7 }); add('paint', { x0: 11.5, z0: -10.2, x1: 30.5, z1: -10.2 });
   add('paint', { x0: 11.5, z0: 8.2, x1: 30.5, z1: 8.2, w: 0.1, color: 0xd8d8d0 }); add('paint', { x0: 11.5, z0: 20.6, x1: 30.5, z1: 20.6, w: 0.1, color: 0xd8d8d0 });
 
+  // the run's goal: the locks to tear apart, and the exit they seal
+  add('exitDoor', { x: 0, z: -22 });
+  add('lock', { x: 21, z: -16, kind: 'generator' });
+  add('lock', { x: -13.5, z: 16.5, kind: 'pumps', ry: Math.PI / 2 });
+
+  // AI-made props (public/models/props): centrifuges, hazmat lockers, trolleys
+  for (const [name, x, z, ry] of [['centrifuge', -12.4, -14.2, 0], ['centrifuge', -12.4, -16.6, 0.4], ['lab_trolley', -19.5, -2.2, 0.3], ['lab_trolley', 3.2, 9.4, -0.6],
+    ['hazmat_locker', -8.9, 7.5, Math.PI / 2], ['hazmat_locker', -8.9, 9.0, Math.PI / 2], ['hazmat_locker', 31.0, -11.5, -Math.PI / 2], ['hazmat_locker', 31.0, -10.0, -Math.PI / 2],
+    ['centrifuge', 12.0, 19.5, 0]]) add('prop', { name, x, z, ry });
+
   // specimen vats: smash one, pick a mutation
   for (const [x, z] of [[-28, -8], [-13.2, 9], [29.5, 13], [24, -8]]) add('vat', { x, z });
 
@@ -77,7 +87,7 @@ export function makeLabLayout(seed = 1337) {
       { id: 'storage', type: 'storage', x0: 10, x1: 32, z0: 6, z1: 22 },
     ],
     walls: [
-      { x0: -32, z0: -22, x1: 32, z1: -22, outer: true }, { x0: -32, z0: 22, x1: 32, z1: 22, outer: true },
+      { x0: -32, z0: -22, x1: -3.5, z1: -22, outer: true }, { x0: 3.5, z0: -22, x1: 32, z1: -22, outer: true }, // (the exit door between) { x0: -32, z0: 22, x1: 32, z1: 22, outer: true },
       { x0: -32, z0: -22, x1: -32, z1: 22, outer: true }, { x0: 32, z0: -22, x1: 32, z1: 22, outer: true },
       { x0: -10, z0: -22, x1: -10, z1: -4 }, { x0: -10, z0: 4, x1: -10, z1: 22 },
       { x0: 10, z0: -22, x1: 10, z1: -7 }, { x0: 10, z0: 1, x1: 10, z1: 22 },
@@ -88,7 +98,7 @@ export function makeLabLayout(seed = 1337) {
     people: [
       { type: 'scientist', room: 'wetlab', n: 10 }, { type: 'scientist', room: 'servers', n: 7 },
       { type: 'scientist', room: 'containment', n: 6 }, { type: 'scientist', room: 'storage', n: 4 },
-      { type: 'soldier', room: 'machines', n: 6 }, { type: 'soldier', room: 'storage', n: 4 },
+      { type: 'soldier', room: 'machines', n: 6 }, { type: 'soldier', room: 'storage', n: 4 }, { type: 'soldier', room: 'servers', n: 3 },
     ],
     spawn: { x: 0, z: 2.5, heading: 0 },
     route: [[0, 6], [-14, 10], [-14, -12], [-26, -12], [-26, 12], [0, 16], [27, 16], [27, -12], [0, -16], [0, 4]],

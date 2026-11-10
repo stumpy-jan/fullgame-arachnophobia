@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sfx } from './audio.js';
 
 // Mutations: one per body slot (Design/DESIGN.md). Each grows its slot's part on the spider (part(spider):
 // returns an undo) and does something: `auto` every frame, or `power` when its slot's key is pressed
@@ -62,6 +63,7 @@ export const MUTATIONS = {
       if (!targets.length) { st.t = 0.2; return; }
       st.t = 1.3;
       for (const o of targets) ctx.quills.fire(from, o.h);
+      if (targets.length) sfx('quill');
     },
   },
   pounce: {

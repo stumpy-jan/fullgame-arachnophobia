@@ -39,6 +39,12 @@ URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` 
   Dijkstra maps on the world's walk grid (distance to the spider, and a flee map whose slopes lead round walls
   and through doors). `bodies.js` draws them as instanced procedural figures (no faces), animated in code.
   Bullets stop on concrete: `world.shotHit` is height-aware, so a wall hides the spider but the top of one doesn't.
+- The goal: `kit.lock` pieces (a generator, bolt pumps) register as slash targets; each lock takes about 6 s
+  of slashing, sparks on every blow and blows when done. When the last one goes the exit door (`kit.exitDoor`)
+  sinks into the floor, daylight floods in, and walking out ends the run (ESCAPED). `node tools/goalcheck.mjs`
+  plays that headless: tears down every lock, walks out, screenshots each step to shots/goal_*.png.
+- `src/audio.js`: every sound is synthesised in Web Audio (footsteps, slash, impale, gunfire by distance, glass,
+  metal, explosions, the door, quills) over a low facility hum and a far siren. It starts on the first key or click.
 - `src/fx.js`: pooled tracers, muzzle flashes, sparks, ichor, blood and floor stains.
 - The impale (`spider.strike`): each free leg rises over the nearest person in reach, stabs down (hit-stop,
   camera kick), carries them to the fangs and feeds (+8 health); then steps back down onto a foothold.

@@ -195,6 +195,13 @@ export class People {
         fall: h.state === 'dead' ? h.fall : 0,
         idle: h.state === 'idle' && h.seed % 2 ? 'look' : null,
       });
+      // a laser sight ends where it hits concrete (or 16 m out)
+      if (h.type === 'soldier' && h.rig.laserRay(_LA, _LD)) {
+        r.group.updateMatrixWorld(true);
+        h.rig.laserRay(_LA, _LD);
+        const t = this.world.shotHit(_LA, _LB.copy(_LA).addScaledVector(_LD, 16));
+        h.rig.laserLength(t >= 0 ? t * 16 : 16);
+      }
       this.rigs.add(r.group);
     }
     this.rigs.end();
@@ -234,4 +241,4 @@ export class People {
   }
 }
 
-const _S = new THREE.Vector3(), _G = new THREE.Vector3(), _A = new THREE.Vector3(), _M = new THREE.Vector3(), _E = new THREE.Vector3(), _D = new THREE.Vector3();
+const _LA = new THREE.Vector3(), _LB = new THREE.Vector3(), _LD = new THREE.Vector3(), _S = new THREE.Vector3(), _G = new THREE.Vector3(), _A = new THREE.Vector3(), _M = new THREE.Vector3(), _E = new THREE.Vector3(), _D = new THREE.Vector3();

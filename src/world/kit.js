@@ -5,6 +5,7 @@ import * as TX from '../textures.js';
 import { splat } from './geom.js';
 import { pbrSet, floorGeometry } from './floors.js';
 import { makeCanvas, fbm, canvasTexture } from '../util.js';
+import { model } from './models.js';
 
 // The level kit: every piece the lab is built from. Each builder takes the build context (ctx, from
 // world.js: the scene root, materials, a seeded random, and the registries for solids, bullet blockers,
@@ -364,4 +365,81 @@ export function vat(ctx, { x, z }) {
   ctx.contact(x, z, 2, 2, true);
   ctx.solidDisc(x, z, 0.95, 0.35);
   ctx.breakables.push({ kind: 'vat', x, z, r: 1.0, parts: [glass, fluid, organ, cap], organ, light, broken: false });
+}
+
+// ------------------------------------------------------------------ the run's goal: locks and the exit
+
+// A lock machine: tear it apart (stand at it; the slash hits it) to unseal the exit. kind 'generator' (the
+// AI-made generator, electrifying the door) or 'pumps' (hydraulic bolt pumps, pistons working).
+export function lock(ctx, { x, z, kind = 'generator', ry = 0 }) {
+  const { M } = ctx;
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; ctx.root.add(g);
+  const add = (geo, mat, px, py, pz) => { const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+  let w = 3.2, d = 1.8, h = 1.9;
+  const pistons = [];
+  const gen = kind === 'generator' && model('generator');
+  if (gen) { g.add(gen); const s = gen.userData.size; w = s.x; d = s.z; h = s.y; }
+  else if (kind === 'generator') { add(boxUV(new RoundedBoxGeometry(w, h, d, 2, 0.04), 1.5), M.darkSteel, 0, h / 2, 0); }
+  else {
+    add(boxUV(new RoundedBoxGeometry(3.4, 0.5, 2.0, 2, 0.04), 1.5), M.darkSteel, 0, 0.25, 0);
+    for (const px of [-1.05, 0, 1.05]) {
+      add(cylGeo(0.36, 0.4, 1.3, 20), M.steel, px, 1.15, 0);
+      const rod = add(cylGeo(0.13, 0.13, 1.0, 12), M.cabinet, px, 2.0, 0);
+      pistons.push(rod);
+    }
+    add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-1.6, 1.6, 0.5), new THREE.Vector3(0, 1.75, 0.6), new THREE.Vector3(1.6, 1.6, 0.5)]), 16, 0.1, 8), M.steel, 0, 0, 0);
+    w = 3.4; d = 2.0; h = 2.5;
+  }
+  // the status light on top: red while it holds, out when it's broken
+  const lamp = add(cylGeo(0.14, 0.18, 0.22, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.1, 0.05) }), 0, h + 0.11, 0);
+  const light = new THREE.PointLight(0xff2010, 14, 8, 2); light.position.set(0, h + 0.5, 0); g.add(light);
+  const sw = Math.abs(Math.cos(ry)) > 0.5 ? w : d, sd = Math.abs(Math.cos(ry)) > 0.5 ? d : w;
+  ctx.contact(x, z, sw, sd);
+  ctx.solidBox(x - sw / 2, x + sw / 2, z - sd / 2, z + sd / 2, h);
+  ctx.blocker({ x0: x - sw / 2, x1: x + sw / 2, z0: z - sd / 2, z1: z + sd / 2, top: h });
+  ctx.locks.push({ kind, x, z, w: sw, d: sd, h, hp: 70, max: 70, group: g, lamp, light, pistons, destroyed: false });
+}
+
+// The exit: a heavy security door in the outer wall (the wall leaves a gap for it), sealed until every lock is
+// down. Behind it, daylight.
+export function exitDoor(ctx, { x, z, w = 7 }) {
+  const { M } = ctx;
+  const g = new THREE.Group(); g.position.set(x, 0, z); ctx.root.add(g);
+  const slab = new THREE.Group(); g.add(slab);
+  const steel = new THREE.MeshStandardMaterial({ color: 0x5a6066, roughness: 0.5, metalness: 0.7, map: M.darkSteel.map, normalMap: M.darkSteel.normalMap });
+  const body = new THREE.Mesh(boxUV(new RoundedBoxGeometry(w, 4.2, 0.7, 2, 0.06), 1.5), steel); body.position.y = 2.1; body.castShadow = body.receiveShadow = true; slab.add(body);
+  const tex = M.hazard.map.clone(); tex.repeat.set(w / 1.2, 1);
+  for (const y of [0.35, 3.85]) for (const sz of [-0.36, 0.36]) {
+    const band = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.1, 0.35), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+    band.position.set(0, y, sz); if (sz < 0) band.rotation.y = Math.PI; slab.add(band);
+  }
+  // bolt lights along the top of the frame: red while sealed, green when open
+  const lights = [];
+  for (let i = 0; i < 5; i++) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.15, 0.05) }));
+    m.position.set((i - 2) * 1.2, 4.45, 0.45); g.add(m); lights.push(m);
+  }
+  // outside: a pool of daylight, dark until the door opens
+  const out = new THREE.Mesh(new THREE.PlaneGeometry(w + 6, 9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0) }));
+  out.position.set(0, 0.02, -5.2); g.add(out);
+  const sun = new THREE.SpotLight(0xfff0d8, 0, 40, 0.55, 0.6, 1.2);
+  sun.position.set(x, 9, z - 12); sun.target.position.set(x, 0, z + 8);
+  ctx.root.add(sun, sun.target);
+  const solid = { x0: x - w / 2, x1: x + w / 2, z0: z - 0.4, z1: z + 0.4, top: 4.2, outer: true, door: true };
+  ctx.solids.push(solid);
+  ctx.door = { x, z, w, slab, lights, out, sun, solid, open: 0, unlocked: false };
+}
+
+// A generated prop (public/models/props, loaded by models.js before the level is built): stands where it's
+// put, turned by ry; walkable on its bounding box. Missing model: nothing.
+export function prop(ctx, { x, z, name, ry = 0 }) {
+  const m = model(name);
+  if (!m) return;
+  m.position.set(x, 0, z); m.rotation.y = ry;
+  ctx.root.add(m);
+  const s = m.userData.size, turned = Math.abs(Math.sin(ry)) > 0.5;
+  const w = turned ? s.z : s.x, d = turned ? s.x : s.z;
+  ctx.contact(x, z, w, d);
+  ctx.solidBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2, s.y);
+  if (s.y > 1.6) ctx.blocker({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, top: s.y });
 }

@@ -23,7 +23,7 @@ export function buildWorld(scene, layout) {
 
   // ---------------------------------------------------------------- the build context the kit uses
   const ctx = {
-    root, M, R: rng(layout.seed), screens: [], lamps: [], beacons: [], breakables: [],
+    root, M, R: rng(layout.seed), screens: [], lamps: [], beacons: [], breakables: [], locks: [], door: null, solids,
     mesh(geo, mat, x, y, z, { cast = true, receive = true } = {}) {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x, y, z);
@@ -109,6 +109,7 @@ export function buildWorld(scene, layout) {
     for (const s of outer) {
       const cx = Math.max(s.x0, Math.min(p.x, s.x1)), cz = Math.max(s.z0, Math.min(p.z, s.z1));
       const dx = p.x - cx, dz = p.z - cz, d2 = dx * dx + dz * dz;
+      if (s.open) continue; // (an exit door once it's open)
       if (d2 < r * r) { const d = Math.sqrt(d2) || 1e-4; p.x += (dx / d) * (r - d); p.z += (dz / d) * (r - d); }
     }
   }
@@ -138,6 +139,12 @@ export function buildWorld(scene, layout) {
     center(j, out) { out.x = B.x0 + ((j % NX) + 0.5) * NC; out.z = B.z0 + (Math.floor(j / NX) + 0.5) * NC; return out; },
     open(x, z) { const j = nav.index(x, z); return j >= 0 && pass[j] === 1; },
   };
+  // knock a rectangle of the height field down to the floor (the exit door, once it has slid up out of the way)
+  function clearHeight(x0, x1, z0, z1) {
+    for (let k = Math.max(0, Math.floor((z0 - GZ) / G)); k <= Math.min(GD - 1, Math.floor((z1 - GZ) / G)); k++) {
+      for (let i = Math.max(0, Math.floor((x0 - GX) / G)); i <= Math.min(GW - 1, Math.floor((x1 - GX) / G)); i++) grid[k * GW + i] = 0;
+    }
+  }
   function roomAt(x, z) { return layout.rooms.find((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) || null; }
 
   function update(t) {
@@ -154,7 +161,7 @@ export function buildWorld(scene, layout) {
   }
 
   return {
-    root, layout, bounds: B, rooms: layout.rooms, breakables: ctx.breakables, heightAt, collide, shotHit, nav, roomAt, update,
+    root, layout, bounds: B, rooms: layout.rooms, breakables: ctx.breakables, locks: ctx.locks, door: ctx.door, clearHeight, heightAt, collide, shotHit, nav, roomAt, update,
     route: layout.route.map(([x, z]) => new THREE.Vector2(x, z)),
     spawn: layout.spawn,
   };

@@ -594,9 +594,16 @@ export class Spider {
         const dx = o.x - this.pos.x, dz = o.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
         return (dx * fx + dz * fz) / d > 0.5 && (dx * Math.cos(this.heading) - dz * Math.sin(this.heading)) * l.s > -1.0;
       });
-      if (!h) continue;
-      taken.add(h);
-      l.strike = { h, t: 0, phase: 'raise', from: new THREE.Vector3(), kind: 'slash', dmg: opts.dmg ?? 2 };
+      // nobody in reach: a thing then (a lock machine: { isTarget, x, z, y, alive(), onHit(dmg) })
+      let tgt = h;
+      if (!tgt) for (const t of opts.targets || []) {
+        if (!t.alive() || taken.has(t)) continue;
+        const dx = t.x - this.pos.x, dz = t.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
+        if (Math.hypot(t.x - hip.x, t.z - hip.z) < STRIKE_REACH + 1 && (dx * fx + dz * fz) / d > 0.3) { tgt = t; break; }
+      }
+      if (!tgt) continue;
+      taken.add(tgt);
+      l.strike = { h: tgt, t: 0, phase: 'raise', from: new THREE.Vector3(), kind: 'slash', dmg: opts.dmg ?? 2 };
       l.stepping = false; l.hover = true;
       n++;
     }
@@ -643,7 +650,7 @@ export class Spider {
     S.t += dt;
     if (S.phase === 'raise') {
       // up over the victim (tracking them), a beat to telegraph it
-      if (!P.alive(h)) { this.endStrike(l); return; }
+      if (!(h.isTarget ? h.alive() : P.alive(h))) { this.endStrike(l); return; }
       const hip = this.hipWorld(l, _H);
       _R.set(h.x + (hip.x - h.x) * 0.15, Math.max(h.y + 3.4, hip.y + 1.4), h.z + (hip.z - h.z) * 0.15);
       l.foot.x = damp(l.foot.x, _R.x, 16, dt); l.foot.y = damp(l.foot.y, _R.y, 16, dt); l.foot.z = damp(l.foot.z, _R.z, 16, dt);
@@ -654,7 +661,7 @@ export class Spider {
       const e = Math.min(1, S.t / 0.07);
       l.foot.lerpVectors(S.from, _R, e * e);
       if (e >= 1 && S.kind === 'slash') {
-        P.hit(h, S.dmg, _D.set(h.x - this.pos.x, 0, h.z - this.pos.z));
+        if (h.isTarget) h.onHit(S.dmg); else P.hit(h, S.dmg, _D.set(h.x - this.pos.x, 0, h.z - this.pos.z));
         this.events.push({ type: 'slash', h, pos: l.foot.clone() });
         this.endStrike(l);
         return;

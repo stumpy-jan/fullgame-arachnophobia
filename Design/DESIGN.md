@@ -21,6 +21,9 @@ Big machines you stand on or beside to tear apart (uses the climbing):
 - **Power generator**: electrifies the door; arcs make the floor around it dangerous.
 - **Security core**: server towers with a shield that drops while its technicians are dead.
 
+Built (first lab): the generator and the bolt pumps, both taken down by the slash (~6 s each, under fire).
+When the last falls, the exit door sinks into the floor and daylight pours in; walking out wins the run.
+
 ## Controls and combat
 
 - **Positioning first.** WASD moves; the body faces where it's going, and when slow or still, the mouse.
