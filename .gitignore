@@ -14,3 +14,4 @@ assets/pilot/*/*_metallic.png
 assets/pilot/*/*_normal.png
 assets/pilot/*/*_roughness.png
 assets/pilot/*/*.glb
+tools/_gym.mjs

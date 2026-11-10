@@ -10,7 +10,7 @@ npm run dev        # http://localhost:5391
 
 Controls: WASD / arrows move (screen-relative), Shift scuttles, Space or click impales (front legs on the move, front four standing still), P toggles the autopilot tour, 1 toggles the post pass, R restarts after death.
 
-URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` no damage, `?nopeople` empty lab, `?gym` an obstacle course with nobody in it (steps 0.4-3.2 m, walls, a tank, clutter; `world/gym.js`), `?classic` the fully procedural spider, `?carapace` the AI-made carapace too, `?eye=x,y,z&look=x,y,z&hide` debug camera, `?cam=height,back` camera distance, `?at=x,z,heading` start position, `?nopost`.
+URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` no damage, `?nopeople` empty lab, `?gym` an obstacle course with nobody in it (steps 0.4-3.2 m, walls, a tank, clutter; `world/gym.js`), `?spider=procedural|abdomen|carapace|both` which spider (the gym has buttons for these, V cycles; `?classic` = procedural), `?eye=x,y,z&look=x,y,z&hide` debug camera, `?cam=height,back` camera distance, `?at=x,z,heading` start position, `?nopost`.
 
 ## How it works
 

@@ -6,8 +6,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { model } from './world/models.js';
 
 // AI-made body parts (assets/pilot/spider_*: concept image, mesh, Blender finish), loaded by main.js before the
-// spider is built. Each fills the box the procedural part filled; without them the procedural body stays.
-export const SPIDER_PARTS = ['spider_abdomen']; // (+ spider_thorax with ?carapace: not yet better than the procedural one)
+// spider is built (main.js picks which: ?spider=). Each fills the box the procedural part filled; without them the
+// procedural body stays.
 // how each mesh came out of the mesher, turned to the body's frame (up +y, front +z): the carapace was meshed
 // standing up, facing the camera; the abdomen lying turned, its spinnerets off to the front right
 const PART_TURN = { spider_thorax: [-Math.PI / 2, 0, 0], spider_abdomen: [0, 2.49, 0] };

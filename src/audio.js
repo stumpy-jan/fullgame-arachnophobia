@@ -2,6 +2,7 @@
 // click (browsers allow audio only after one). sfx(name, gain) plays a one-shot; the ambience (a low facility
 // hum and a far-off two-tone siren) runs underneath.
 let ac = null, master = null, noiseBuf = null;
+export const audioOpts = { siren: true }; // (the gym turns the siren off)
 
 function start() {
   if (ac) return;
@@ -60,6 +61,7 @@ function ambience() {
   const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 140;
   const g = ac.createGain(); g.gain.value = 0.05;
   hum.connect(lp).connect(g).connect(master); hum.start();
+  if (!audioOpts.siren) return;
   const siren = ac.createOscillator(); siren.type = 'triangle'; siren.frequency.value = 600;
   const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 0.55;
   const lfoG = ac.createGain(); lfoG.gain.value = 110; lfo.connect(lfoG).connect(siren.frequency);

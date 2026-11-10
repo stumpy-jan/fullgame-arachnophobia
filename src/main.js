@@ -4,14 +4,14 @@ import { buildWorld } from './world/world.js';
 import { makeLabLayout } from './world/layout.js';
 import { makeGymLayout } from './world/gym.js';
 import { loadModels } from './world/models.js';
-import { Spider, SPIDER_PARTS } from './spider.js';
+import { Spider } from './spider.js';
 import { Post, postParams } from './post.js';
 import { softDot } from './textures.js';
 import { damp, clamp } from './util.js';
 import { FX } from './fx.js';
 import { People } from './people/people.js';
 import { Hud } from './hud.js';
-import { sfx, falloff } from './audio.js';
+import { sfx, falloff, audioOpts } from './audio.js';
 import { Mutations, MUTATIONS, SLOTS, SLOT_NAMES, SLOT_KEYS } from './mutations.js';
 
 // URL switches: ?auto (autopilot tour), ?shot (for tools/shot.mjs: no HUD, fixed time step),
@@ -39,9 +39,14 @@ scene.fog = new THREE.FogExp2(0x030506, 0.012);
 
 // the level: a layout (plain data; hand-made now, generated later) built into meshes + query services
 // (the AI-made models first: the kit places them as it builds)
-await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...(Q.has('classic') ? [] : SPIDER_PARTS), ...(Q.has('carapace') ? ['spider_thorax'] : [])]); // (?classic: the procedural spider)
+// which spider: ?spider=procedural|abdomen|carapace|both (the gym has buttons for them); the game uses the AI abdomen
+const VERSIONS = { procedural: 'Procedural', abdomen: 'AI abdomen', carapace: 'AI carapace', both: 'AI both' };
+const VERSION_PARTS = { procedural: [], abdomen: ['spider_abdomen'], carapace: ['spider_thorax'], both: ['spider_abdomen', 'spider_thorax'] };
+const version = VERSIONS[Q.get('spider')] ? Q.get('spider') : Q.has('classic') ? 'procedural' : Q.has('carapace') ? 'both' : 'abdomen';
+await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version]]);
 // ?gym: an obstacle course with nobody in it, for moving the spider around (world/gym.js)
 const GYM = Q.has('gym');
+if (GYM) audioOpts.siren = false;
 const lab = buildWorld(scene, GYM ? makeGymLayout() : makeLabLayout());
 const spider = new Spider(scene, lab);
 spider.place(lab.spawn.x, lab.spawn.z, lab.spawn.heading);
@@ -52,6 +57,12 @@ const fx = new FX(scene);
 const people = Q.has('nopeople') || GYM ? null : new People(scene, lab, spider, fx);
 const state = { hp: 100, kills: 0, over: false, hurt: 0, log: [] };
 const hud = new Hud();
+// the gym's spider picker: reloads with the chosen version, the spider where it stood (V cycles)
+if (GYM) {
+  const go = (v) => { const q = new URLSearchParams(location.search); q.delete('classic'); q.delete('carapace'); q.set('spider', v); q.set('at', [spider.pos.x, spider.pos.z, spider.heading].map((n) => n.toFixed(2)).join(',')); location.search = q.toString().replace(/=(?=&|$)/g, ''); };
+  hud.versions(VERSIONS, version, go);
+  addEventListener('keydown', (e) => { if (e.code === 'KeyV') { const k = Object.keys(VERSIONS); go(k[(k.indexOf(version) + 1) % k.length]); } });
+}
 
 // dust in the air, drifting through the lamp light
 const dust = (() => {

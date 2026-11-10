@@ -64,5 +64,13 @@ export class Hud {
     this.choiceEl.style.display = 'flex';
   }
   closeChoice() { this.choiceEl.style.display = 'none'; }
+  // the gym's picker: one button per spider version, the current one lit
+  versions(list, current, onPick) {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;right:16px;top:14px;display:flex;gap:6px;align-items:center;font:11px/1.3 ui-monospace,Consolas,monospace;letter-spacing:0.08em;color:#9aa5a2;z-index:5';
+    el.innerHTML = 'SPIDER <span style="opacity:0.6">(V)</span>' + Object.entries(list).map(([k, name]) => `<button data-k="${k}" style="font:inherit;letter-spacing:inherit;padding:5px 9px;cursor:pointer;background:${k === current ? 'rgba(206,60,40,0.35)' : 'rgba(6,8,9,0.65)'};color:${k === current ? '#fff' : '#b8c2bf'};border:1px solid ${k === current ? 'rgba(226,80,60,0.9)' : 'rgba(255,255,255,0.18)'}">${name}</button>`).join('');
+    for (const b of el.querySelectorAll('button')) b.onclick = () => b.dataset.k !== current && onPick(b.dataset.k);
+    document.body.appendChild(el);
+  }
   end(text) { this.over.innerHTML = `${text}<small>press R to try again</small>`; this.over.style.display = 'flex'; }
 }
