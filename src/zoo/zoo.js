@@ -7,6 +7,8 @@ import { Bodies } from '../people/bodies.js';
 import { operator, silhouette } from './figures.js';
 import { sculpted } from '../people/sculpted.js';
 import { damp } from '../util.js';
+import { loadModels, model, FIT } from '../world/models.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // The zoo: one approach to drawing the people per stage, side by side, in the game's own lighting and post
 // pass, seen from the gameplay camera (V: or close up; O: orbit). Each stage: a scientist running, a
@@ -30,6 +32,7 @@ const STAGES = [
   { name: 'A. Current', text: 'Capsules and spheres, instanced. Cheap, but the stiff limbs read as dolls.', make: null },
   { name: 'B. Sculpted', text: 'Procedural, sculpted (pass 2): proportions, lab coats with a swinging tail and collar, hair and skin variety, hazmat suits with respirator, tank and hose, a proper rifle; a run with folding knees, hip and shoulder twist, glances back; an aiming stance with recoil, laser sight and torch; hands; a flail when grabbed, a death fall, typing and looking round.', make: sculpted },
   { name: 'C. Operators', text: 'Abstract: no arms or legs, a hooded silhouette that glides; an oversized floating rifle with a laser sight and a torch cone; scientists carry a glowing tablet.', make: operator },
+  { name: 'E. AI props', text: 'Left: the procedural stand-ins in the game today. Right: the same things from the team’s Modal pipeline (Qwen image, Pixal3D mesh), cut to budget with gltfpack, KTX2 textures.', props: true },
   { name: 'D. Lights', text: 'Near-black silhouettes in the dark lab, read by what they emit: amber visor slits and torch cones (soldiers), reflective coat stripes (scientists).', make: silhouette },
 ];
 const GAP = 14;
@@ -52,12 +55,32 @@ beacon.position.set(GAP * 1.5, 4, -9); scene.add(beacon, beacon.target);
 const bodies = new Bodies(scene, 8);
 const actors = [];
 STAGES.forEach((st, i) => {
+  if (st.props) return;
   for (const [type, mode, k] of [['scientist', 'run', 0], ['soldier', 'run', 1], ['soldier', 'aim', 2], ['scientist', 'run', 3], ['scientist', 'idle', 4], ['scientist', 'grabbed', 5], ['soldier', 'die', 6], ['scientist', 'type', 7]]) {
     const a = { stage: i, type, mode, k, x: i * GAP, z: 0, heading: 0, phase: k * 2, stride: 0, aim: 0, lean: 0, fall: 0, tilt: 0, flail: false, y: 0 };
     a.fireT = 9; a.shot = 0; a.panic = 0;
     if (st.make) { a.fig = st.make(type, { seed: i * 10 + k + 1 }); scene.add(a.fig.group); }
     actors.push(a);
   }
+});
+
+// the props stage: stand-ins (left) and generated models (right), the same objects in the same order
+await loadModels(renderer, Object.keys(FIT));
+STAGES.forEach((st, i) => {
+  if (!st.props) return;
+  const x = i * GAP, grey = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0.3 });
+  const stand = [
+    ['centrifuge', new THREE.CylinderGeometry(0.45, 0.45, 1.1, 24), 0xd8d8d4, 0.55],
+    ['hazmat_locker', new RoundedBoxGeometry(1.0, 1.9, 0.6, 2, 0.04), 0xc39222, 0.95],
+    ['lab_trolley', new RoundedBoxGeometry(0.9, 0.9, 0.55, 2, 0.03), 0x9aa3a8, 0.45],
+    ['generator', new RoundedBoxGeometry(2.8, 1.5, 1.2, 2, 0.04), 0x40464b, 0.75],
+  ];
+  stand.forEach(([name, geo, col, hh], k) => {
+    const z = -3.3 + k * 2.2;
+    const b = new THREE.Mesh(geo, grey(col)); b.position.set(x - 2.2, hh, z); b.castShadow = b.receiveShadow = true; scene.add(b);
+    const m = model(name); if (m) { m.position.set(x + 2.2, 0, z); m.rotation.y = -0.5; scene.add(m); }
+  });
+  for (const [name, dx] of [['hazmat_hood', -0.4], ['rifle', 0.6]]) { const m = model(name); if (m) { m.position.set(x + dx, 0.6, 4.6); m.rotation.y = -0.6; scene.add(m); } }
 });
 
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.3, 300);

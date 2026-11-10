@@ -5,3 +5,5 @@ shots
 tools/_probe.mjs
 tools/_kills.mjs
 tools/_head.html
+tools/bin
+assets/pilot/*/raw_*.glb
