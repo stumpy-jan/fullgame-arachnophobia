@@ -85,3 +85,20 @@ To preview: `?gym&mut=devour,quills`.
   first prompt worked. `61_3`'s socket came out as an open tube.
 - The finish's `"fit"` takes an axis (`x`, `y` or `z`), not `max`.
 - All three were finished at 8k faces with the thin-shell settings, then cut down with `tools/decimate.py`.
+
+## Tanks and vats: lid and specimen
+
+The camera looks straight down on the containment tanks and specimen vats, so what it sees is the cap. The
+procedural cap was a blank grey disc. The glass, the fluid and its glow stay procedural (the mesher can't make
+glass, and a vat's parts must stay separate so it can break). The AI parts:
+- `tank_lid` (`img_61_2`, 8k tris): a bolted lid with a hatch, a red valve wheel and hoses. The top-down concept
+  was meshed as a whole drum, with the lid as its front face. `tools/cut.py <raw> 0.42` keeps the front slice
+  and caps the cut, and the finish's `"tilt": [-90, 0]` turns it face up. At 2.5k tris all those bolts shattered,
+  and the tanks are few, so the lid ships at 8k.
+- `specimen` (`img_77_0`, 3k tris): a curled pink larva for the vats. "A preserved creature specimen, curled up
+  like an unborn thing" painted human foetuses. "A larva ... segmented grub-like body ... many thin jointed legs
+  ... no face, no human features" gave the creature. It is lit from within in the vat (the map as its emissive map).
+- `tank_base` was tried and left out: its concepts kept a glass cylinder standing in it until the prompt said
+  "empty ... no glass". The mesh leaned with the concept's three-quarter camera (fixed with `"tilt": [-22, 0]`),
+  and in game it read as a crumpled pale ring that adds nothing from above. The procedural collar stays.
+- Hookup: `kit.js` is gameplay's (`tankPart` in the hand-over patch); `main.js` loads `tank_lid` and `specimen`.

@@ -1,0 +1,78 @@
+{
+  "title": "Tank base",
+  "concept": "The steel plinth a containment tank's glass stands in.",
+  "sheet": "Studio product photograph of a single round heavy steel base plinth for a laboratory tank, on its own and empty: low and wide, a bolted flange round its flat top with an empty shallow round socket in the middle, nothing standing in it, no glass, short pipes with valves and a pressure gauge on its side, cable conduits, worn dark grey steel with scuffs and rust, seen from front three-quarter above. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    61,
+    77
+  ],
+  "notes": "Budget: 2,000 triangles, 1K maps. Under the glass; the vat and the tank scale it.",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_77_1.glb",
+    "fit": [
+      "x",
+      1.0
+    ],
+    "faces": 8000,
+    "budget": 2000,
+    "texture": 1024,
+    "looks": {
+      "body": {
+        "color": [
+          0.2,
+          0.2,
+          0.21
+        ],
+        "shade": [
+          0.1,
+          0.1,
+          0.11
+        ],
+        "roughness": 0.55,
+        "pattern": "metal",
+        "scale": 40,
+        "bump": 0.12,
+        "texture_color": 0.9,
+        "cavity": {
+          "color": [
+            0.02,
+            0.02,
+            0.02
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "amount": 0.25,
+          "roughness": 0.35
+        },
+        "metallic": 0.6
+      }
+    },
+    "thicken_m": 0.004,
+    "shrinkwrap_reach": 0.002,
+    "tilt": [
+      -22,
+      0
+    ]
+  },
+  "sheet_v1": "Studio product photograph of a single round heavy steel base plinth for a cylindrical laboratory tank, on its own: low and wide, a bolted flange round its top with an empty round recess where a glass cylinder would stand, short pipes with valves and a pressure gauge on its side, cable conduits, worn dark grey steel with scuffs and rust, seen from front three-quarter above. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "picks": {
+    "sheet": "img_77_1.png"
+  }
+}
