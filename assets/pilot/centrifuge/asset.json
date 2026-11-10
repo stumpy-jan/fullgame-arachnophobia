@@ -1,0 +1,12 @@
+{
+  "title": "Floor centrifuge",
+  "concept": "A floor-standing laboratory centrifuge in a dark underground containment lab, lid flung open, a red alarm light sweeping over it.",
+  "sheet": "Museum or studio product photograph of an industrial floor-standing laboratory centrifuge, about 1.1 m tall, white enamelled steel body, brushed stainless round lid on top, a small control panel with a dark display, scuffed and used. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 4,000 triangles, 1K maps (furniture under 1.5 m). Gameplay camera sees it at about 4 cm per pixel."
+}

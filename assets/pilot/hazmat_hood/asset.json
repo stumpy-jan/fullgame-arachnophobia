@@ -1,0 +1,12 @@
+{
+  "title": "Hazmat hood with respirator",
+  "concept": "Soldiers in yellow hazmat suits sweeping a dark lab with torches.",
+  "sheet": "Studio product photograph of a yellow rubberised hazmat suit hood with a full-face respirator built in: a dark tinted visor and two round filter canisters at the cheeks, shown on its own as if worn by an invisible person, front three-quarter view. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 2,000 triangles, 1K maps (a rigid part fixed to the procedural skeleton's head bone). Gameplay camera sees it at about 4 cm per pixel."
+}

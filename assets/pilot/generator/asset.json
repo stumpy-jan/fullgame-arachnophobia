@@ -1,0 +1,12 @@
+{
+  "title": "Generator",
+  "concept": "An industrial generator humming in an underground machine room, pipes running up into the dark.",
+  "sheet": "Studio product photograph of an industrial diesel generator unit, about 2.8 m long, dark grey painted steel housing with louvred vents, an exhaust pipe on top, a control panel with gauges and switches, yellow warning labels, oil stains and wear. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 15,000 triangles, 2K maps (under 3 m). Gameplay camera sees it at about 4 cm per pixel."
+}

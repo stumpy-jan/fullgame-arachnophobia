@@ -1,0 +1,12 @@
+{
+  "title": "Rifle",
+  "concept": "A security soldier aiming a rifle with a laser sight down a dark corridor.",
+  "sheet": "Studio product photograph of a generic modern black rifle with no brand markings, side view, stock, magazine, short rail with a small torch under the barrel, matte black polymer and metal. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 1,500 triangles, 1K maps (rigid, carried by the right hand). Gameplay camera sees it at about 4 cm per pixel."
+}

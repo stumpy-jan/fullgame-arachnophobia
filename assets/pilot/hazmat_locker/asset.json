@@ -1,0 +1,12 @@
+{
+  "title": "Hazmat locker",
+  "concept": "A tall hazardous-materials cabinet against a concrete blast wall in an abandoned lab, doors dented.",
+  "sheet": "Studio product photograph of a tall steel hazardous-materials storage cabinet, about 1.9 m tall, yellow powder-coated paint with black-and-yellow hazard stripes at the base, two closed doors with a lever handle and vents, worn edges and scuffs. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 5,000 triangles, 1K-2K maps. Gameplay camera sees it at about 4 cm per pixel."
+}

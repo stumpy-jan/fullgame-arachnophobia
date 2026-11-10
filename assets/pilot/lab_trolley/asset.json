@@ -1,0 +1,12 @@
+{
+  "title": "Lab trolley",
+  "concept": "A laboratory trolley knocked over in a lab corridor, sample trays scattered.",
+  "sheet": "Studio product photograph of a stainless steel laboratory trolley, about 0.9 m tall, two shelves, four black castor wheels, white plastic sample trays and a few glass bottles on the shelves. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 3,000 triangles, 1K maps. Gameplay camera sees it at about 4 cm per pixel."
+}
