@@ -146,6 +146,7 @@ function applySettings(changed) {
 
 // input
 const keys = new Set();
+const IDLE = () => ({ x: 0, z: 0, sprint: false, face: spider.heading }); // (standing still)
 let auto = Q.has('auto'), wp = 0;
 // the cursor, on the floor: where the body turns to face when slow, and where a pounce lands
 const mouse = new THREE.Vector2(0, 0), aim = new THREE.Vector3(), ray = new THREE.Raycaster(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -330,6 +331,8 @@ function frame(now) {
   if (choosing || (mode !== 'play' && mode !== 'over')) dt = 0;
   if (mode === 'play') runTime += dt;
   ray.setFromCamera(mouse, camera); ray.ray.intersectPlane(floorPlane, aim);
+  // the title (and pause): the world holds still, but the spider stands and breathes (its legs are placed by its update)
+  if (dt === 0 && !choosing) spider.update(real, IDLE());
   if (dt > 0) {
     time += dt;
     spider.update(dt, readInput());
@@ -410,6 +413,8 @@ function frame(now) {
   post.render(scene, camera, time);
   requestAnimationFrame(frame);
 }
+// pose the spider before anything is drawn: its legs are placed by its update, and the title holds the world still
+for (let i = 0; i < 30; i++) spider.update(1 / 30, IDLE());
 applySettings();
 updateCamera(1, 0);
 await renderer.compileAsync(scene, camera).catch(() => {});

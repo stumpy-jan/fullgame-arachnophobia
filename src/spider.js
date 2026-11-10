@@ -162,7 +162,10 @@ export class Spider {
     const shell = this.shell = aiPart('spider_thorax', new THREE.Vector3(1.5, 0.6, 1.55), baked(0.55));
     if (shell) { // the generated carapace replaces both lumps
       shell.position.set(0, 0.1, 0.16); this.root.add(shell);
-      this.thorax.visible = hump.visible = false;
+      // it replaces the hump; the thorax stays inside and under it, slimmer, as the body the legs come out of (the shell
+      // is hollow: without it the spider is a lid on legs, seen from anywhere but straight above)
+      hump.visible = false;
+      this.thorax.scale.set(0.6, 0.3, 0.72); this.thorax.position.y = -0.12;
       shell.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
     }
     // body slots (Design/DESIGN.md): mutations hang their parts on these sockets (or on the legs, by pair). They're
@@ -253,7 +256,7 @@ export class Spider {
   // changes) shows up as a number, not in a screenshot. Mutation parts are found by where they hang (a socket, a
   // leg segment), so new mutations are covered without being listed here.
   joints() {
-    const thorax = this.shell ? [this.shell] : [this.thorax, this.hump];
+    const thorax = this.shell ? [this.shell, this.thorax] : [this.thorax, this.hump];
     const head = this.mask ? [this.mask, ...thorax] : thorax;
     const side = (l) => `${l.k}${l.s > 0 ? 'R' : 'L'}`;
     const J = [];
@@ -280,7 +283,7 @@ export class Spider {
   bodyShapes() {
     const key = Object.values(this.mounts).map((m) => m.children.length).join() + !!this.mask + !!this.shell;
     if (this._shapes && this._shapesKey === key) return this._shapes;
-    const shapes = [], thorax = this.shell ? [this.shell] : [this.thorax, this.hump];
+    const shapes = [], thorax = this.shell ? [this.shell, this.thorax] : [this.thorax, this.hump];
     const named = [['thorax', thorax], ['mask', this.mask ? [this.mask] : []], ['pedicel', [this.pedicel]], ['abdomen', [this.abdomen]]];
     for (const [slot, m] of Object.entries(this.mounts)) named.push([slot + ' part', m.children]);
     for (const [name, objs] of named) for (const o of objs) o.traverse((q) => {
@@ -367,7 +370,7 @@ export class Spider {
       }
       // seat it on the thorax that's there: back along -z until it touches (its numbers were set on one body)
       g.updateMatrixWorld(true);
-      const thorax = this.shell ? [this.shell] : [this.thorax, this.hump];
+      const thorax = this.shell ? [this.shell, this.thorax] : [this.thorax, this.hump];
       for (const o of thorax) o.updateWorldMatrix(true, true);
       const tv = sampleVerts(thorax, 3000, this.root);
       for (let i = 0; i < 30 && nearest(sampleVerts([g], 500), tv) > 0.015; i++) { g.position.z -= 0.01; g.updateMatrixWorld(true); }
