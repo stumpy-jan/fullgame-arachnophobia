@@ -295,15 +295,15 @@ export function buildLab(scene) {
   scene.add(new THREE.HemisphereLight(0x7a93a8, 0x0d0d0f, 0.22));
   const lamps = [];
   const lamp = (x, z, shadow, flicker = 0) => {
-    const y = 7.2;
-    const l = new THREE.SpotLight(0xffe8cc, 340, 0, 0.95, 0.65, 2);
+    const y = 10.2; // high: a lifted leg must not pass right by the bulb
+    const l = new THREE.SpotLight(0xffe8cc, 700, 0, 0.72, 0.65, 2);
     l.position.set(x, y - 0.3, z);
     l.target.position.set(x, 0, z);
     root.add(l, l.target);
     if (shadow) {
       l.castShadow = true;
       l.shadow.mapSize.set(1024, 1024);
-      l.shadow.camera.near = 1; l.shadow.camera.far = 14;
+      l.shadow.camera.near = 1; l.shadow.camera.far = 18;
       l.shadow.bias = -0.0004; l.shadow.normalBias = 0.03;
     }
     // the fixture: a pendant shade on a cable up out of view
@@ -326,15 +326,25 @@ export function buildLab(scene) {
   beacon(-10, -4.3, 0); beacon(10, 1.3, 2);
 
   // ---------------------------------------------------------------- queries
-  function heightAt(x, z) {
-    let h = 0;
-    for (const s of solids) {
-      if (s.r !== undefined) {
-        const dx = x - s.cx, dz = z - s.cz;
-        if (dx * dx + dz * dz < s.r * s.r && s.top > h) h = s.top;
-      } else if (x > s.x0 && x < s.x1 && z > s.z0 && z < s.z1 && s.top > h) h = s.top;
+  // The height field: every solid rasterised at 10 cm into a grid (the spider asks thousands of times
+  // a frame). A cell holds the highest top over its centre; outside the grid it's floor.
+  const G = 0.1, GX = -33, GZ = -23, GW = 660, GD = 460, grid = new Float32Array(GW * GD);
+  for (const so of solids) {
+    const x0 = so.r !== undefined ? so.cx - so.r : so.x0, x1 = so.r !== undefined ? so.cx + so.r : so.x1;
+    const z0 = so.r !== undefined ? so.cz - so.r : so.z0, z1 = so.r !== undefined ? so.cz + so.r : so.z1;
+    const i0 = Math.max(0, Math.ceil((x0 - GX) / G - 0.5)), i1 = Math.min(GW - 1, Math.floor((x1 - GX) / G - 0.5));
+    const k0 = Math.max(0, Math.ceil((z0 - GZ) / G - 0.5)), k1 = Math.min(GD - 1, Math.floor((z1 - GZ) / G - 0.5));
+    for (let k = k0; k <= k1; k++) {
+      for (let i = i0; i <= i1; i++) {
+        if (so.r !== undefined) { const dx = GX + (i + 0.5) * G - so.cx, dz = GZ + (k + 0.5) * G - so.cz; if (dx * dx + dz * dz > so.r * so.r) continue; }
+        const j = k * GW + i;
+        if (so.top > grid[j]) grid[j] = so.top;
+      }
     }
-    return h;
+  }
+  function heightAt(x, z) {
+    const i = Math.floor((x - GX) / G), k = Math.floor((z - GZ) / G);
+    return i < 0 || k < 0 || i >= GW || k >= GD ? 0 : grid[k * GW + i];
   }
   // push a circle (the spider's body) back inside the outer walls
   function collide(p, r) {

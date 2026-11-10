@@ -95,6 +95,19 @@ function readInput() {
   return { x: x / l, z: z / l, sprint };
 }
 
+// ?measure: leg / body clipping into obstacles, every frame (tools/clipcheck.mjs reads window.game.clip)
+const clip = Q.has('measure') ? { frames: 0, bad: 0, deep: 0, max: 0, maxAt: 0, legFrames: 0, worst: [], kinds: {} } : null;
+function measureClip() {
+  const r = spider.clipStats();
+  clip.frames++;
+  clip.legFrames += r.legs;
+  if (r.depth > 0.05) clip.bad++;
+  if (r.depth > 0.3) clip.deep++;
+  if (r.depth > clip.max) { clip.max = r.depth; clip.maxAt = time; }
+  if (r.depth > 0.05) clip.kinds[r.kind] = (clip.kinds[r.kind] || 0) + 1;
+  if (r.depth > 0.3) clip.worst.push([+time.toFixed(2), +r.depth.toFixed(2), +spider.pos.x.toFixed(1), +spider.pos.z.toFixed(1), r.kind]);
+}
+
 // main loop (fixed 60 Hz steps when shooting, so captures are repeatable)
 let last = performance.now(), time = 0;
 function frame(now) {
@@ -105,6 +118,7 @@ function frame(now) {
   for (let i = 0; i < steps; i++) {
     time += dt;
     spider.update(dt, readInput());
+    if (clip) measureClip();
     for (const e of spider.events) if (e.type === 'step') shake = Math.min(0.6, shake + 0.06);
   }
   lab.update(time);
@@ -117,4 +131,4 @@ updateCamera(1, 0);
 requestAnimationFrame(frame);
 
 // for tools and the console
-window.game = { spider, lab, camera, postParams, CAM, renderer, get time() { return time; } };
+window.game = { spider, lab, camera, postParams, CAM, renderer, clip, get time() { return time; } };
