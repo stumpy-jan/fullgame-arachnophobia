@@ -11,7 +11,14 @@ import { model } from './world/models.js';
 // how each mesh came out of the mesher, turned to the body's frame (up +y, front +z): the carapace was painted
 // from straight above and meshed standing up, its dome facing the camera and its front at the top of the image;
 // the abdomen lying turned, its spinnerets off to the front right
-const PART_TURN = { spider_thorax: [-Math.PI / 2, 0, Math.PI], spider_abdomen: [0, 2.49, 0] };
+// the mutation parts: the mandible and quills (long along x, their face to +z) to long along z, face up and out;
+// the scythe (socket to tip along x, its curve bulging to +y) along a leg segment's +y, bulging to +z
+const PART_TURN = {
+  spider_thorax: [-Math.PI / 2, 0, Math.PI], spider_abdomen: [0, 2.49, 0],
+  maw_mandible: [-Math.PI / 2, 0, -Math.PI / 2], abdomen_quills: [-Math.PI / 2, 0, -Math.PI / 2], foreleg_scythe: [Math.PI / 2, Math.PI / 2, 0],
+};
+// the mutation parts (spider.mutationPart): which mutation each is for is up to mutations.js
+export const MUTATION_PARTS = ['maw_mandible', 'abdomen_quills', 'foreleg_scythe'];
 function aiPart(name, size, look) {
   const m = model(name);
   if (!m) return null;
@@ -163,6 +170,9 @@ export class Spider {
 
     // body slots (Design/DESIGN.md): mutations hang their parts on these mounts (or on the legs, by pair)
     this.mat = { chitin, leg: legMat, abdomen: this.abMat };
+    // an AI mutation part (assets/pilot, MUTATION_PARTS), fitted to a box (its core: see aiPart) and dressed in the
+    // spider's satin over its baked maps, k its brightness; null until loaded (loadModels with MUTATION_PARTS)
+    this.mutationPart = (name, size, k = 0.55) => aiPart(name, size, baked(k));
     this.mounts = { maw: new THREE.Group(), carapace: new THREE.Group(), abdomen: new THREE.Group(), glands: new THREE.Group() };
     this.root.add(this.mounts.maw, this.mounts.carapace);
     this.mounts.carapace.position.set(0, 0.3, 0.3);

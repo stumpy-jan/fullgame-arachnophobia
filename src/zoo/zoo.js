@@ -83,6 +83,8 @@ STAGES.forEach((st, i) => {
     const m = model(name); if (m) { m.position.set(x + 2.2, 0, z); m.rotation.y = -0.5; scene.add(m); }
   });
   for (const [name, dx] of [['hazmat_hood', -0.9], ['rifle', 0.1], ['air_tank', 1.1]]) { const m = model(name); if (m) { m.position.set(x + dx, 0.6, 4.6); m.rotation.y = -0.6; scene.add(m); } }
+  // the spider's mutation parts, as they come (on the spider they're fitted to their slot: ?gym&mut=...)
+  for (const [name, dx] of [['maw_mandible', -1.6], ['abdomen_quills', 0], ['foreleg_scythe', 1.6]]) { const m = model(name); if (m) { m.position.set(x + dx, 0.3, 7.4); m.rotation.y = -0.4; scene.add(m); } }
   // the soldier gear, before and after: the procedural hood, tank and rifle (left), the AI ones (right), aiming
   for (const [dx, gear] of [[-1, false], [1, true]]) {
     const fig = sculpted('soldier', { seed: 3, gear });
