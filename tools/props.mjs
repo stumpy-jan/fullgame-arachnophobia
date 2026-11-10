@@ -20,9 +20,11 @@ function triangles(file) { // count from the GLB's JSON chunk
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(BUDGET);
 for (const n of names) {
   const dir = join(ROOT, n);
+  // prefer the Blender-finished model (hero_asset.py finish, then tools/clean_floor.py): already at budget, re-baked maps
+  const finished = [join(dir, n + '_clean.glb'), join(dir, n + '.glb')].find(existsSync);
   const raw = existsSync(dir) && readdirSync(dir).filter((f) => f.startsWith('raw_') && f.endsWith('.glb')).sort().pop();
-  if (!raw) { console.log(n, 'no raw mesh yet'); continue; }
-  const src = join(dir, raw), tris = triangles(src), ratio = Math.min(1, BUDGET[n] / tris);
+  if (!finished && !raw) { console.log(n, 'no mesh yet'); continue; }
+  const src = finished || join(dir, raw), tris = triangles(src), ratio = finished ? 1 : Math.min(1, BUDGET[n] / tris);
   const out = join(OUT, `${n}.glb`);
   // the native gltfpack (tools/bin, from github.com/zeux/meshoptimizer releases): the npm build can't do KTX2
   execFileSync('tools/bin/gltfpack.exe', ['-i', src, '-o', out, '-si', ratio.toFixed(6), ...(process.env.AGGRESSIVE ? ['-sa'] : []), '-tc', '-tl', String(TEX[n] || 1024), '-cc'], { stdio: 'pipe' });

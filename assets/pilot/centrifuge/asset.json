@@ -8,5 +8,65 @@
     37,
     59
   ],
-  "notes": "Budget: 4,000 triangles, 1K maps (furniture under 1.5 m). Gameplay camera sees it at about 4 cm per pixel."
+  "notes": "Budget: 4,000 triangles, 1K maps (furniture under 1.5 m). Gameplay camera sees it at about 4 cm per pixel.",
+  "picks": {
+    "sheet": "img_21_1.png"
+  },
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_21_1.glb",
+    "fit": [
+      "z",
+      1.1
+    ],
+    "faces": 4000,
+    "texture": 1024,
+    "looks": {
+      "body": {
+        "color": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "shade": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "roughness": 0.45,
+        "pattern": "metal",
+        "scale": 40,
+        "bump": 0.15,
+        "texture_color": 0.9,
+        "cavity": {
+          "color": [
+            0.03,
+            0.03,
+            0.03
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.6,
+            0.6,
+            0.6
+          ],
+          "amount": 0.25,
+          "roughness": 0.35
+        },
+        "metallic": 0.3
+      }
+    }
+  }
 }

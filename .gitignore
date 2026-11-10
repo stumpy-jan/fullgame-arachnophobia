@@ -7,3 +7,10 @@ tools/_kills.mjs
 tools/_head.html
 tools/bin
 assets/pilot/*/raw_*.glb
+assets/pilot/*/work/
+assets/pilot/*/renders/
+assets/pilot/*/*_basecolor.png
+assets/pilot/*/*_metallic.png
+assets/pilot/*/*_normal.png
+assets/pilot/*/*_roughness.png
+assets/pilot/*/*.glb

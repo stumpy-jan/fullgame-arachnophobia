@@ -8,5 +8,65 @@
     37,
     59
   ],
-  "notes": "Budget: 2,000 triangles, 1K maps (a rigid part fixed to the procedural skeleton's head bone). Gameplay camera sees it at about 4 cm per pixel."
+  "notes": "Budget: 2,000 triangles, 1K maps (a rigid part fixed to the procedural skeleton's head bone). Gameplay camera sees it at about 4 cm per pixel.",
+  "picks": {
+    "sheet": "img_21_2.png"
+  },
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_21_2.glb",
+    "fit": [
+      "z",
+      0.34
+    ],
+    "faces": 4000,
+    "texture": 1024,
+    "looks": {
+      "body": {
+        "color": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "shade": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "roughness": 0.45,
+        "pattern": "felt",
+        "scale": 60,
+        "bump": 0.08,
+        "texture_color": 0.9,
+        "cavity": {
+          "color": [
+            0.03,
+            0.03,
+            0.03
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.7,
+            0.6,
+            0.1
+          ],
+          "amount": 0.1,
+          "roughness": 0.4
+        }
+      }
+    },
+    "thicken_m": 0.003
+  }
 }
