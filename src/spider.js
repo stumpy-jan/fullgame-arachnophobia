@@ -842,10 +842,33 @@ export function maskFromHead(src) {
     }
     pos.setXYZ(i, x, y - 1.75, z - 0.15);                         // origin between the eyes, at the back
   }
+  // Close it into a solid: a flat back behind the face and a rim round its cut edge. The camera looks down past
+  // it from behind, and open, its culled back let the floor show through between the chelicerae.
+  const P = [], U = [], I = [], front = new Map();
+  // the face keeps the scan's UVs; the back and rim are projected (the scan's would stretch into streaks down the rim)
+  const vert = (x, y, z, i) => { P.push(x, y, z); if (uv) { if (i >= 0) U.push(uv.getX(i), uv.getY(i)); else U.push((x + 0.5 * z) * 0.2, (y + z) * 0.2); } return P.length / 3 - 1; };
+  let zMin = Infinity;
+  for (const i of out) zMin = Math.min(zMin, pos.getZ(i));
+  const zBack = zMin - 0.25;
+  for (const i of new Set(out)) front.set(i, vert(pos.getX(i), pos.getY(i), pos.getZ(i), i));
+  const back = new Map();
+  for (const i of front.keys()) back.set(i, vert(pos.getX(i), pos.getY(i), zBack, -1));
+  const edges = new Map(); // undirected edge -> its direction in the one front triangle that has it (an open edge)
+  for (let t = 0; t < out.length; t += 3) {
+    const [a, b, c] = [out[t], out[t + 1], out[t + 2]];
+    I.push(front.get(a), front.get(b), front.get(c), back.get(a), back.get(c), back.get(b));
+    for (const [p, q] of [[a, b], [b, c], [c, a]]) { const k = p < q ? `${p},${q}` : `${q},${p}`; edges.set(k, edges.has(k) ? null : [p, q]); }
+  }
+  for (const e of edges.values()) {
+    if (!e) continue;
+    const [a, b] = e, f = (i, z) => vert(pos.getX(i), pos.getY(i), z, -1); // (its own vertices: a crisp rim)
+    const fa = f(a, pos.getZ(a)), fb = f(b, pos.getZ(b)), ba = f(a, zBack), bb = f(b, zBack);
+    I.push(fa, ba, bb, fa, bb, fb);
+  }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', pos);
-  if (uv) geo.setAttribute('uv', uv);
-  geo.setIndex(out);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  if (uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  geo.setIndex(I);
   geo.computeVertexNormals();
   return geo;
 }

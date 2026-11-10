@@ -37,3 +37,29 @@ procedural part filled, under the spider's own satin material). What we learned:
   backface culling, so open sides show as holes: `blender -b -P tools/rawsides.py -- <raw.glb>` writes `<raw>_sides.png`.
 - In use behind `?spider=carapace|both`: `img_77_0` (of `img_61_2`, `img_77_0`, `img_77_2`; `77_2` grew claws at the
   sides, `61_2` came out thin, with leg stubs).
+
+## Soldier gear (hood v2, air tank, rifle)
+
+Rigid parts for the sculpted soldier: hood on the head bone, tank on the chest bone, rifle in the gun group. They're
+tried on in the zoo only (`zoo.html?stage=3&view=gear`, `&turn=` for the heading); `sculpted.js` doesn't use them yet.
+Mounts are in `GEAR` in `src/zoo/zoo.js`. Each part is counter-scaled for the body's scale and placed by its centre.
+
+- Hood v2 (`img_61_0`): "covers only the head ... ending in a short gathered ruff at the neck, no shoulders". v1 had
+  shoulders, which would clip when the head turns. 2,000 tris. Two colour zones (yellow fabric first, so a missed
+  face falls back to it, then the black mask) and no raw texture colour.
+- Air tank (`img_61_0`): a cylinder on a back frame with straps. 1,500 tris (at 800 the straps shattered into shards).
+- Rifle: the pilot's (`img_21_0`) was already closed on all sides and at 1,497 tris.
+- **Bake big, cut later.** Finishing straight to 2k/800 faces left black patches and shattered thin parts: the
+  low-poly drifts further from the raw mesh than the bake rays reach. Finish at `"faces": 8000`, then
+  `blender -b -P tools/decimate.py -- assets/pilot/<asset> <tris>` writes `<asset>_clean.glb`, which `props.mjs` packs.
+- **Thin shells** (hood, straps): `"thicken_m"` and a short `"shrinkwrap_reach"` (0.002 for the hood, 0.006 for the
+  tank). With the default reach the shrinkwrap folds low-poly faces inside out, and they render as black specks.
+- gltfpack can't simplify across the finish's UV seams (it stops near 6k), and `-sa` drags colour across them (the
+  yellow hood came out camo). Blender's collapse decimate keeps the seams.
+
+## The face mask
+
+The face (`maskFromHead` in `src/spider.js`, cut from the head scan) was a one-sided surface. The gameplay camera looks
+down past it from behind, so its back faces were culled and the floor showed through between the chelicerae. It's
+now closed into a solid: a flat back behind the face and a rim stitched round its cut edge. The back and rim get
+projected UVs, because the scan's UVs stretch into streaks down the rim.

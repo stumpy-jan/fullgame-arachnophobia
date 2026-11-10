@@ -32,7 +32,7 @@ const STAGES = [
   { name: 'A. Current', text: 'Capsules and spheres, instanced. Cheap, but the stiff limbs read as dolls.', make: null },
   { name: 'B. Sculpted', text: 'Procedural, sculpted (pass 2): proportions, lab coats with a swinging tail and collar, hair and skin variety, hazmat suits with respirator, tank and hose, a proper rifle; a run with folding knees, hip and shoulder twist, glances back; an aiming stance with recoil, laser sight and torch; hands; a flail when grabbed, a death fall, typing and looking round.', make: sculpted },
   { name: 'C. Operators', text: 'Abstract: no arms or legs, a hooded silhouette that glides; an oversized floating rifle with a laser sight and a torch cone; scientists carry a glowing tablet.', make: operator },
-  { name: 'E. AI props', text: 'Left: the procedural stand-ins in the game today. Right: the same things from the team’s Modal pipeline (Qwen image, Pixal3D mesh), cut to budget with gltfpack, KTX2 textures.', props: true },
+  { name: 'E. AI props', text: 'Left: the procedural stand-ins in the game today. Right: the same things from the team’s Modal pipeline (Qwen image, Pixal3D mesh), cut to budget with gltfpack, KTX2 textures. In front (?view=gear, ?turn=heading): the soldier gear tried on, procedural (left) and the AI hood, tank and rifle (right).', props: true },
   { name: 'D. Lights', text: 'Near-black silhouettes in the dark lab, read by what they emit: amber visor slits and torch cones (soldiers), reflective coat stripes (scientists).', make: silhouette },
 ];
 const GAP = 14;
@@ -64,6 +64,14 @@ STAGES.forEach((st, i) => {
   }
 });
 
+// where the AI soldier gear sits on the sculpted skeleton (bone-local units; each model stands on its own
+// base, centred): the hood on the head, the tank on the chest behind the back, the rifle in the gun group
+const GEAR = {
+  hood: { pos: [0, -0.03, 0.01], ry: 0 },
+  tank: { pos: [0, 0.2, -0.2], ry: Math.PI },
+  rifle: { pos: [0, -0.02, 0.05], ry: -Math.PI / 2 },
+};
+
 // the props stage: stand-ins (left) and generated models (right), the same objects in the same order
 await loadModels(renderer, Object.keys(FIT));
 STAGES.forEach((st, i) => {
@@ -80,11 +88,44 @@ STAGES.forEach((st, i) => {
     const b = new THREE.Mesh(geo, grey(col)); b.position.set(x - 2.2, hh, z); b.castShadow = b.receiveShadow = true; scene.add(b);
     const m = model(name); if (m) { m.position.set(x + 2.2, 0, z); m.rotation.y = -0.5; scene.add(m); }
   });
-  for (const [name, dx] of [['hazmat_hood', -0.4], ['rifle', 0.6]]) { const m = model(name); if (m) { m.position.set(x + dx, 0.6, 4.6); m.rotation.y = -0.6; scene.add(m); } }
+  for (const [name, dx] of [['hazmat_hood', -0.9], ['rifle', 0.1], ['air_tank', 1.1]]) { const m = model(name); if (m) { m.position.set(x + dx, 0.6, 4.6); m.rotation.y = -0.6; scene.add(m); } }
+  // the soldier gear tried on (a preview only: sculpted.js keeps its own parts until we wire these in): the
+  // procedural soldier (left) and the same soldier wearing the AI hood, tank and rifle (right), aiming
+  for (const [dx, ai] of [[-1, false], [1, true]]) {
+    const fig = sculpted('soldier', { seed: 3 });
+    fig.group.position.set(x + dx, 0, 5.6); fig.group.rotation.y = +(Q.get('turn') || 1.25); // (?turn=: the try-on's heading)
+    fig.update(0, 0, { phase: 0, aim: 1 });
+    scene.add(fig.group);
+    if (ai) wearGear(fig.group);
+  }
 });
 
+// Swap the sculpted soldier's procedural hood, tank and rifle for the AI parts (found by their shapes: the
+// figure doesn't hand out its bones), each counter-scaled for the body's scale so it keeps its real size.
+function wearGear(root) {
+  let head = null, chest = null, gun = null;
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    const p = o.geometry?.parameters;
+    if (o.geometry?.type === 'SphereGeometry' && p.radius === 0.13) head = o.parent;
+    if (o.geometry?.type === 'CapsuleGeometry' && p.radius === 0.085) chest = o.parent;
+    if (o.material?.blending === THREE.AdditiveBlending && o.geometry?.type === 'SphereGeometry') gun = o.parent;
+  });
+  const hide = (bone, keep = () => false) => bone && bone.children.forEach((c) => { if (c.isMesh && !keep(c)) c.visible = false; });
+  const put = (bone, name, [px, py, pz], ry) => {
+    const m = model(name); if (!bone || !m) return;
+    const s = bone.getWorldScale(new THREE.Vector3()).x;
+    m.scale.setScalar(1 / s); m.position.set(px, py - m.userData.size.y / 2 / s, pz); m.rotation.y = ry; bone.add(m); // (pos: where its centre goes)
+  };
+  hide(head); hide(gun, (c) => c.material.blending === THREE.AdditiveBlending);
+  if (chest) chest.children.forEach((c) => { if (c.geometry?.type === 'CapsuleGeometry' || c.geometry?.type === 'TubeGeometry') c.visible = false; });
+  put(head, 'hazmat_hood', GEAR.hood.pos, GEAR.hood.ry);
+  put(chest, 'air_tank', GEAR.tank.pos, GEAR.tank.ry);
+  put(gun, 'rifle', GEAR.rifle.pos, GEAR.rifle.ry);
+}
+
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.3, 300);
-let stage = +(Q.get('stage') || 0), view = Q.get('view') === 'close' ? 'close' : 'game';
+let stage = +(Q.get('stage') || 0), view = ['close', 'gear'].includes(Q.get('view')) ? Q.get('view') : 'game'; // (gear: the soldier gear try-on, props stage)
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = false;
 addEventListener('keydown', (e) => {
@@ -138,8 +179,8 @@ function frame(now) {
 
   // camera
   const sx = stage * GAP;
-  const want = view === 'game' ? [sx, 34, 17] : [sx, 7.5, 9.5];
-  const look = view === 'game' ? [sx, 0, 0] : [sx, 0.6, -0.4];
+  const want = view === 'game' ? [sx, 34, 17] : view === 'gear' ? [sx + 2.2, 2.6, 7.6] : [sx, 7.5, 9.5];
+  const look = view === 'game' ? [sx, 0, 0] : view === 'gear' ? [sx + 0.9, 1.9, 5.6] : [sx, 0.6, -0.4];
   if (!orbit.enabled) {
     const k = SHOT ? 1 : 1 - Math.exp(-6 * dt);
     camPos.lerp(new THREE.Vector3(...want), k); camLook.lerp(new THREE.Vector3(...look), k);
