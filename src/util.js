@@ -78,3 +78,16 @@ export function angleTo(a, b) {
   if (d < -Math.PI) d += Math.PI * 2;
   return d;
 }
+
+// Cylinder UVs in metres (sides: around x height; caps: planar), so tiled textures keep their scale.
+export function cylUV(geo, ts = 1.5) {
+  const { radiusTop: rt, radiusBottom: rb, height: h } = geo.parameters;
+  const circ = Math.PI * 2 * Math.max(rt, rb);
+  const uv = geo.attributes.uv, n = geo.attributes.normal, p = geo.attributes.position;
+  for (let i = 0; i < uv.count; i++) {
+    if (Math.abs(n.getY(i)) > 0.99) uv.setXY(i, p.getX(i) / ts, p.getZ(i) / ts);
+    else uv.setXY(i, (uv.getX(i) * circ) / ts, (uv.getY(i) * h) / ts);
+  }
+  uv.needsUpdate = true;
+  return geo;
+}

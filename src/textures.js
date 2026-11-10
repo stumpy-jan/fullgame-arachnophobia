@@ -12,6 +12,7 @@ export function floorTextures() {
   const slabTone = Array.from({ length: 64 }, () => 0.94 + R() * 0.12);
   const [c, g] = makeCanvas(S, S), [cr, gr] = makeCanvas(S, S);
   const img = g.createImageData(S, S), rim = gr.createImageData(S, S);
+  const hgt = new Float32Array(S * S);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const i = y * S + x;
@@ -29,6 +30,7 @@ export function floorTextures() {
       img.data[k + 1] = Math.min(255, v * 96);
       img.data[k + 2] = Math.min(255, v * 100);
       img.data[k + 3] = 255;
+      hgt[i] = n3[i] * 0.5 + n1[i] * 0.12 - (seam < 3 ? (3 - seam) * 0.35 : 0);
       let r = 0.72 - n3[i] * 0.1 - Math.min(0.22, wet * 0.5);
       if (seam < 3) r = 0.95;
       rim.data[k] = rim.data[k + 1] = rim.data[k + 2] = Math.max(0.08, r) * 255;
@@ -48,16 +50,17 @@ export function floorTextures() {
     g.quadraticCurveTo(x + Math.cos(a + 0.4) * l * 0.5, y + Math.sin(a + 0.4) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l);
     g.stroke();
   }
-  return { map: canvasTexture(c), rough: canvasTexture(cr, { srgb: false }) };
+  return { map: canvasTexture(c), rough: canvasTexture(cr, { srgb: false }), normal: normalFromHeight(hgt, S, S, 3) };
 }
 
 // Partition walls: painted steel panels, dark scuffed base band, a hazard stripe, a lighter upper half.
 // u: 2 m per repeat; v: 0 (floor) .. 1 (top).
-export function wallTexture() {
+export function wallTextures() {
   const W = 512, H = 512;
-  const n = fbm(W, H, 6, 4, 21);
+  const n = fbm(W, H, 6, 4, 21), f = fbm(W, H, 64, 2, 22);
   const [c, g] = makeCanvas(W, H);
   const img = g.createImageData(W, H);
+  const hgt = new Float32Array(W * H), rough = new Float32Array(W * H);
   for (let y = 0; y < H; y++) {
     const v = 1 - y / H; // 0 at the floor
     for (let x = 0; x < W; x++) {
@@ -74,11 +77,14 @@ export function wallTexture() {
       const px = x % 256;
       if (px < 2 || Math.abs(v - 0.58) < 0.004) m *= 0.45;   // panel seams
       if (px > 4 && px < 8 && (Math.abs(v - 0.25) < 0.006 || Math.abs(v - 0.9) < 0.006)) m *= 0.6; // rivets row
+      hgt[i] = f[i] * 0.4 + n[i] * 0.3 - (px < 3 || Math.abs(v - 0.58) < 0.005 ? 1 : 0) - (v < 0.13 ? 0.3 : 0)
+        + ((px - 128) ** 2 + ((v * 512) % 64 - 32) ** 2 < 9 ? 0.6 : 0); // seams, the kick plate step, bolts
+      rough[i] = (v < 0.155 ? 0.55 : 0.68) + n[i] * 0.2 + (f[i] - 0.5) * 0.15;
       img.data[k] = r * m; img.data[k + 1] = gg * m; img.data[k + 2] = b * m; img.data[k + 3] = 255;
     }
   }
   g.putImageData(img, 0, 0);
-  return canvasTexture(c);
+  return { map: canvasTexture(c), normal: normalFromHeight(hgt, W, H, 4), rough: greyTexture(rough, W, H) };
 }
 
 // Generic grime: tinted by each material's colour (map * color).
@@ -146,25 +152,28 @@ export function hazardTexture() {
 }
 
 // The spider's legs: lengthwise (v) bands, dark chitin with a rusty band and a pale ring at each joint.
-export function legTexture() {
-  const W = 64, H = 512;
-  const n = fbm(W, H, 4, 3, 51);
+export function legTextures() {
+  const W = 128, H = 512;
+  const n = fbm(W, H, 4, 3, 51), f = fbm(W, H, 32, 2, 52);
   const [c, g] = makeCanvas(W, H);
   const img = g.createImageData(W, H);
+  const hgt = new Float32Array(W * H), rough = new Float32Array(W * H);
   for (let y = 0; y < H; y++) {
     const v = y / H;
     for (let x = 0; x < W; x++) {
       const i = y * W + x, k = i * 4;
-      let r = 20, gg = 14, b = 16;
+      let r = 34, gg = 24, b = 24;
       const e = Math.min(v, 1 - v);
       if (e < 0.1) { const t = (1 - e / 0.1) ** 2; r += 46 * t; gg += 14 * t; b += 8 * t; } // rusty joints
       const streak = Math.sin(x / W * Math.PI * 2 * 6 + n[i] * 4) * 0.5 + 0.5;            // lengthwise ridges
       const m = (0.7 + n[i] * 0.5) * (0.8 + streak * 0.3);
+      hgt[i] = streak * 0.6 + f[i] * 0.5 + (Math.sin(v * 140 + n[i] * 6) > 0.92 ? 0.4 : 0); // ridges, pits, growth rings
+      rough[i] = 0.48 + f[i] * 0.3 + (1 - streak) * 0.12;
       img.data[k] = r * m; img.data[k + 1] = gg * m; img.data[k + 2] = b * m; img.data[k + 3] = 255;
     }
   }
   g.putImageData(img, 0, 0);
-  return canvasTexture(c);
+  return { map: canvasTexture(c), normal: normalFromHeight(hgt, W, H, 3), rough: greyTexture(rough, W, H) };
 }
 
 // The abdomen: dark mottled chitin with a faint paler fleck (equirectangular, for a sphere). Also its bump.
@@ -189,4 +198,116 @@ export function softDot() {
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   return canvasTexture(c, { repeat: false });
+}
+
+// ------------------------------------------------------------------------------------------------
+// Surface detail: what keeps things from looking like plastic. Highlights break up on a normal map
+// and on varied roughness; edges and chips catch the light differently from the flat paint.
+
+// tangent-space normal map (OpenGL, +y = +v) from a tileable height field
+export function normalFromHeight(h, W, H, strength) {
+  const [c, g] = makeCanvas(W, H);
+  const img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    const yu = ((y - 1 + H) % H) * W, yd = ((y + 1) % H) * W;
+    for (let x = 0; x < W; x++) {
+      const xl = (x - 1 + W) % W, xr = (x + 1) % W;
+      const dx = (h[y * W + xr] - h[y * W + xl]) * strength;
+      const dy = (h[yd + x] - h[yu + x]) * strength;   // image rows go down, v goes up
+      const l = Math.hypot(dx, dy, 1), k = (y * W + x) * 4;
+      img.data[k] = (-dx / l * 0.5 + 0.5) * 255;
+      img.data[k + 1] = (dy / l * 0.5 + 0.5) * 255;
+      img.data[k + 2] = (1 / l * 0.5 + 0.5) * 255;
+      img.data[k + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return canvasTexture(c, { srgb: false });
+}
+
+// a greyscale data texture (roughness and the like) from a 0..1 array
+export function greyTexture(a, W, H) {
+  const [c, g] = makeCanvas(W, H);
+  const img = g.createImageData(W, H);
+  for (let i = 0; i < W * H; i++) {
+    const v = Math.max(0, Math.min(1, a[i])) * 255;
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return canvasTexture(c, { srgb: false });
+}
+
+// Worn painted metal for the props: { map, normal, rough }. map is a grey multiplier for each
+// material's colour: grime in the low spots, chipped paint (bright bare metal) and scratches.
+// roughness: paint ~0.6-0.85, chips and scratches shinier. Material roughness multiplies it.
+export function wornTextures(seed) {
+  const S = 512, R = rng(seed);
+  const big = fbm(S, S, 4, 5, seed + 1), fine = fbm(S, S, 64, 2, seed + 2), mid = fbm(S, S, 16, 3, seed + 3);
+  const h = new Float32Array(S * S), alb = new Float32Array(S * S), rough = new Float32Array(S * S);
+  for (let i = 0; i < S * S; i++) {
+    const chip = Math.max(0, mid[i] - 0.68) * 8;                  // paint chipped off
+    h[i] = fine[i] * 0.35 + big[i] * 0.4 - Math.min(1, chip) * 0.5;
+    alb[i] = (0.62 + big[i] * 0.42 + (fine[i] - 0.5) * 0.2) * (1 + Math.min(1, chip) * 0.6);
+    rough[i] = 0.62 + big[i] * 0.25 + (fine[i] - 0.5) * 0.15 - Math.min(1, chip) * 0.3;
+  }
+  // scratches: short straight scores, slightly shiny and slightly lighter
+  for (let s = 0; s < 220; s++) {
+    let x = R() * S, y = R() * S;
+    const a = R() * Math.PI, l = 8 + R() * 60, dx = Math.cos(a), dy = Math.sin(a);
+    for (let t = 0; t < l; t++) {
+      const i = (((y | 0) % S + S) % S) * S + (((x | 0) % S + S) % S);
+      h[i] -= 0.25; alb[i] *= 1.12; rough[i] -= 0.18;
+      x += dx; y += dy;
+    }
+  }
+  const [c, g] = makeCanvas(S, S);
+  const img = g.createImageData(S, S);
+  for (let i = 0; i < S * S; i++) { const v = Math.min(255, alb[i] * 255); img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255; }
+  g.putImageData(img, 0, 0);
+  return { map: canvasTexture(c), normal: normalFromHeight(h, S, S, 6), rough: greyTexture(rough, S, S) };
+}
+
+// Chitin for the spider's body: { map, normal, rough } (equirectangular). Fine pits and wrinkles
+// that break the highlight up, short bristle streaks running back along the body (u), a dull sheen.
+export function chitinTextures(seed, base = [30, 21, 22]) {
+  const W = 1024, H = 512;
+  const n = fbm(W, H, 8, 5, seed), f = fbm(W, H, 96, 2, seed + 1), w = fbm(W, H, 24, 3, seed + 2);
+  const h = new Float32Array(W * H), rough = new Float32Array(W * H);
+  const [c, g] = makeCanvas(W, H);
+  const img = g.createImageData(W, H);
+  const R = rng(seed + 3);
+  for (let i = 0; i < W * H; i++) {
+    const wrinkle = Math.abs(w[i] - 0.5) * 2;                    // ridged noise: creases
+    h[i] = f[i] * 0.5 + (1 - wrinkle) * 0.6;
+    const fleck = Math.max(0, f[i] - 0.66) * 3;
+    const v = 0.7 + n[i] * 0.5 + fleck * 0.6;
+    img.data[i * 4] = base[0] * v; img.data[i * 4 + 1] = base[1] * v; img.data[i * 4 + 2] = base[2] * v; img.data[i * 4 + 3] = 255;
+    rough[i] = 0.5 + f[i] * 0.3 + wrinkle * 0.1;
+  }
+  // bristles: thin streaks, lighter, rough
+  for (let s = 0; s < 5000; s++) {
+    let x = R() * W, y = R() * H;
+    const l = 4 + R() * 10, dy = (R() - 0.5) * 0.3;
+    for (let t = 0; t < l; t++) {
+      const i = ((y | 0) % H) * W + ((x | 0) % W);
+      h[i] += 0.5; rough[i] = 0.85;
+      img.data[i * 4] = Math.min(255, img.data[i * 4] * 1.5 + 6); img.data[i * 4 + 1] = Math.min(255, img.data[i * 4 + 1] * 1.4 + 4); img.data[i * 4 + 2] = Math.min(255, img.data[i * 4 + 2] * 1.3 + 3);
+      x += 1; y += dy;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return { map: canvasTexture(c), normal: normalFromHeight(h, W, H, 3), rough: greyTexture(rough, W, H) };
+}
+
+// Soft contact shadow under things (alpha in the green channel: white = dark). rect or round.
+export function contactTexture(round) {
+  const S = 128;
+  const [c, g] = makeCanvas(S, S);
+  g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+  g.filter = 'blur(14px)';
+  g.fillStyle = '#fff';
+  if (round) { g.beginPath(); g.arc(S / 2, S / 2, S * 0.3, 0, Math.PI * 2); g.fill(); }
+  else g.fillRect(S * 0.22, S * 0.22, S * 0.56, S * 0.56);
+  g.filter = 'none';
+  return canvasTexture(c, { repeat: false, srgb: false });
 }

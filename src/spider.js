@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clamp, damp, angleTo, rng } from './util.js';
-import { legTexture, abdomenTexture } from './textures.js';
+import { legTextures, chitinTextures } from './textures.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // The specimen: a car-sized spider, animated entirely in code.
@@ -47,11 +47,17 @@ export class Spider {
   build(scene) {
     const R = rng(99);
     // chitin with a velvet sheen (the hair, from a distance) and a thin wet clearcoat
-    const chitin = new THREE.MeshPhysicalMaterial({ color: 0x1c1418, roughness: 0.5, metalness: 0.05, clearcoat: 0.5, clearcoatRoughness: 0.3, sheen: 0.6, sheenColor: 0x4a3024, sheenRoughness: 0.5 });
-    const legTex = legTexture();
-    const legMat = new THREE.MeshPhysicalMaterial({ map: legTex, bumpMap: legTex, bumpScale: 3, roughness: 0.5, metalness: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.3, sheen: 0.6, sheenColor: 0x4a3024, sheenRoughness: 0.45 });
-    const abTex = abdomenTexture();
-    this.abMat = new THREE.MeshPhysicalMaterial({ map: abTex, bumpMap: abTex, bumpScale: 2, roughness: 0.5, clearcoat: 0.55, clearcoatRoughness: 0.28, sheen: 0.6, sheenColor: 0x4a3024, sheenRoughness: 0.5 });
+    // Chitin: satin, not glossy. No clearcoat (that's what made it read as plastic): the shine comes from a
+    // roughness map with pits and creases, a normal map with fine wrinkles and bristle streaks, and a
+    // faint sheen for the hair. Specular tinted warm so highlights aren't white.
+    const ch = chitinTextures(71, [48, 34, 30]), abT = chitinTextures(72, [54, 36, 30]), lg = legTextures();
+    const satin = (t, extra = {}) => new THREE.MeshPhysicalMaterial({
+      map: t.map, normalMap: t.normal, normalScale: new THREE.Vector2(1, 1), roughnessMap: t.rough, roughness: 0.78, metalness: 0,
+      specularIntensity: 1, specularColor: 0xffe2cc, sheen: 0.5, sheenColor: 0x7a5a44, sheenRoughness: 0.55, ...extra,
+    });
+    const chitin = satin(ch);
+    const legMat = satin(lg);
+    this.abMat = satin(abT);
     // glossy black beads with a red glow deep in them
     const eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x050203, emissive: 0xff2208, emissiveIntensity: 1.6, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05 });
     const add = (parent, geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => {

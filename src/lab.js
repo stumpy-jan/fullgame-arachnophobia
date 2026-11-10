@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { rng, boxUV } from './util.js';
+import { rng, boxUV, cylUV } from './util.js';
+const cylGeo = (...a) => cylUV(new THREE.CylinderGeometry(...a));
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import * as TX from './textures.js';
 
 // The lab: a walled floor plan of five rooms, flat-topped props the spider can walk over, and the lights.
@@ -35,27 +37,32 @@ export function buildLab(scene) {
   const disc = (cx, cz, r, top) => solids.push({ cx, cz, r, top });
 
   // ---------------------------------------------------------------- materials
-  const grime = TX.grimeTexture();
   const floorT = TX.floorTextures();
-  floorT.map.repeat.set(64 / 16, 44 / 16); floorT.rough.repeat.copy(floorT.map.repeat);
-  const wallT = TX.wallTexture();
+  for (const t of [floorT.map, floorT.rough, floorT.normal]) t.repeat.set(64 / 16, 44 / 16);
+  const wallT = TX.wallTextures();
+  // worn paint / metal: three variants so neighbouring props don't share the same chips
+  const W1 = TX.wornTextures(101), W2 = TX.wornTextures(202), W3 = TX.wornTextures(303);
+  // a worn surface: colour x grime map, normal map, roughness map (x the material's roughness)
+  const worn = (w, color, roughness, metalness, extra = {}) => new THREE.MeshStandardMaterial({
+    color, map: w.map, normalMap: w.normal, normalScale: new THREE.Vector2(0.8, 0.8), roughnessMap: w.rough, roughness, metalness, ...extra,
+  });
   const hazard = TX.hazardTexture();
   const rack = TX.rackTextures();
   const M = {
-    floor: new THREE.MeshStandardMaterial({ map: floorT.map, roughnessMap: floorT.rough, roughness: 1, metalness: 0 }),
-    wall: new THREE.MeshStandardMaterial({ map: wallT, roughness: 0.62, metalness: 0.15 }),
-    wallTop: new THREE.MeshStandardMaterial({ color: 0x3a4044, map: grime, roughness: 0.8 }),
-    cabinet: new THREE.MeshStandardMaterial({ color: 0x8f9aa0, map: grime, roughness: 0.5, metalness: 0.35 }),
-    benchTop: new THREE.MeshStandardMaterial({ color: 0x141618, roughness: 0.22, metalness: 0.05 }),
-    steel: new THREE.MeshStandardMaterial({ color: 0x9aa3a8, map: grime, roughness: 0.38, metalness: 0.85 }),
-    darkSteel: new THREE.MeshStandardMaterial({ color: 0x3a4045, map: grime, roughness: 0.5, metalness: 0.7 }),
-    rackFront: new THREE.MeshStandardMaterial({ map: rack.map, emissiveMap: rack.emissive, emissive: 0xffffff, emissiveIntensity: 2.2, roughness: 0.45, metalness: 0.5 }),
-    rackSide: new THREE.MeshStandardMaterial({ color: 0x1d2124, map: grime, roughness: 0.45, metalness: 0.6 }),
-    crateGreen: new THREE.MeshStandardMaterial({ color: 0x4d5a3c, map: grime, roughness: 0.75 }),
-    crateGrey: new THREE.MeshStandardMaterial({ color: 0x5c6266, map: grime, roughness: 0.55, metalness: 0.4 }),
-    crateWood: new THREE.MeshStandardMaterial({ color: 0x8a6a45, map: grime, roughness: 0.85 }),
-    drumYellow: new THREE.MeshStandardMaterial({ color: 0xc7951f, map: grime, roughness: 0.5, metalness: 0.4 }),
-    drumBlue: new THREE.MeshStandardMaterial({ color: 0x24507a, map: grime, roughness: 0.5, metalness: 0.4 }),
+    floor: new THREE.MeshStandardMaterial({ map: floorT.map, roughnessMap: floorT.rough, normalMap: floorT.normal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 1, metalness: 0 }),
+    wall: new THREE.MeshStandardMaterial({ map: wallT.map, normalMap: wallT.normal, roughnessMap: wallT.rough, roughness: 1, metalness: 0.1 }),
+    wallTop: worn(W1, 0x464c50, 1.1, 0.1),
+    cabinet: worn(W1, 0x8a949a, 1.0, 0.2),                       // painted steel
+    benchTop: worn(W2, 0x2a2d30, 0.7, 0.0, { normalScale: new THREE.Vector2(0.2, 0.2) }), // black resin, satin
+    steel: worn(W3, 0x8d959a, 0.75, 0.8),                        // bare steel, scuffed
+    darkSteel: worn(W2, 0x40464b, 0.95, 0.5),
+    rackFront: new THREE.MeshStandardMaterial({ map: rack.map, emissiveMap: rack.emissive, emissive: 0xffffff, emissiveIntensity: 2.2, roughness: 0.6, metalness: 0.4, normalMap: W3.normal, normalScale: new THREE.Vector2(0.4, 0.4) }),
+    rackSide: worn(W3, 0x24282b, 0.9, 0.4),
+    crateGreen: worn(W1, 0x56623f, 1.15, 0.05),                  // army-green paint
+    crateGrey: worn(W2, 0x60666a, 1.0, 0.3),
+    crateWood: worn(W3, 0x8a6a45, 1.25, 0.0),
+    drumYellow: worn(W1, 0xc39222, 1.0, 0.2),
+    drumBlue: worn(W2, 0x29537a, 1.0, 0.2),
     hazard: new THREE.MeshStandardMaterial({ map: hazard, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0xbfe8e0, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1 }),
     fluid: new THREE.MeshStandardMaterial({ color: 0x2a6b1a, emissive: 0x7dff3a, emissiveIntensity: 0.9, roughness: 0.2, transparent: true, opacity: 0.85 }),
@@ -76,12 +83,29 @@ export function buildLab(scene) {
     return m;
   };
   // a box standing on `y0`, size (w, h, d), metre-tiled UVs
+  // (bevelled: a sharp CG edge never catches the light; a 3-4 cm round-over does)
   const block = (x, z, w, h, d, mat, y0 = 0, solid = true) => {
-    const geo = boxUV(new THREE.BoxGeometry(w, h, d), 1.5);
+    const r = Math.min(0.04, w * 0.2, h * 0.2, d * 0.2);
+    const geo = boxUV(new RoundedBoxGeometry(w, h, d, 2, r), 1.5);
     const m = mesh(geo, mat, x, y0 + h / 2, z);
     if (solid) box(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y0 + h);
+    if (y0 === 0) contact(x, z, w, d);
     return m;
   };
+  // contact shadow: a soft dark footprint on the floor round the base of everything (ambient occlusion,
+  // faked: what grounds an object; without it, things float)
+  const aoRect = TX.contactTexture(false), aoRound = TX.contactTexture(true);
+  const aoMat = (t, o) => new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: t, transparent: true, opacity: o, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const AO = { rect: aoMat(aoRect, 0.8), round: aoMat(aoRound, 0.85) };
+  const contactGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  function contact(x, z, w, d, round = false) {
+    // the texture's blurred shape spans the middle 56%; grow the quad so that matches the footprint + ~0.25 m
+    const m = new THREE.Mesh(contactGeo, round ? AO.round : AO.rect);
+    m.position.set(x, 0.002, z);
+    m.scale.set((w + 0.5) / (round ? 0.6 : 0.56), 1, (d + 0.5) / (round ? 0.6 : 0.56));
+    m.renderOrder = -1;
+    root.add(m);
+  }
 
   // ---------------------------------------------------------------- floor
   const floor = mesh(new THREE.PlaneGeometry(64, 44), M.floor, 0, 0, 0, { cast: false });
@@ -95,7 +119,8 @@ export function buildLab(scene) {
     const horiz = Math.abs(z1 - z0) < 0.01;
     const w = horiz ? Math.abs(x1 - x0) + WALL_T : WALL_T, d = horiz ? WALL_T : Math.abs(z1 - z0) + WALL_T;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    const geo = new THREE.BoxGeometry(w, WALL_H, d);
+    const geo = new RoundedBoxGeometry(w, WALL_H, d, 2, 0.05);
+    contact(cx, cz, w, d);
     // side faces: u along the wall at 2 m per repeat, v = full height (bands at the base)
     boxUV(geo, 2, true);
     const m = new THREE.Mesh(geo, [M.wall, M.wall, M.wallTop, M.wallTop, M.wall, M.wall]);
@@ -146,8 +171,8 @@ export function buildLab(scene) {
       } else if (r < 0.65) { // beakers
         for (let b = 0; b < 3; b++) {
           const bx = px + (R() - 0.5) * 0.5, bz = pz + (R() - 0.5) * 0.4, h = 0.18 + R() * 0.2;
-          mesh(new THREE.CylinderGeometry(0.06, 0.07, h, 12), M.glass, bx, 0.92 + h / 2, bz, { cast: false });
-          mesh(new THREE.CylinderGeometry(0.055, 0.065, h * 0.5, 12), M.fluid, bx, 0.92 + h * 0.25, bz, { cast: false });
+          mesh(cylGeo(0.06, 0.07, h, 12), M.glass, bx, 0.92 + h / 2, bz, { cast: false });
+          mesh(cylGeo(0.055, 0.065, h * 0.5, 12), M.fluid, bx, 0.92 + h * 0.25, bz, { cast: false });
         }
       } else if (r < 0.85) { // a steel case
         block(px, pz, 0.5, 0.18, 0.36, M.steel, 0.92);
@@ -156,12 +181,13 @@ export function buildLab(scene) {
   };
   const tank = (x, z, broken = false) => {
     const r = 1.45, h = 2.6;
-    mesh(new THREE.CylinderGeometry(r + 0.2, r + 0.3, 0.45, 40), M.darkSteel, x, 0.225, z);
+    mesh(cylGeo(r + 0.2, r + 0.3, 0.45, 40), M.darkSteel, x, 0.225, z);
+    contact(x, z, (r + 0.3) * 2, (r + 0.3) * 2, true);
     if (!broken) {
-      mesh(new THREE.CylinderGeometry(r, r, h, 40, 1, true), M.glass, x, 0.45 + h / 2, z, { cast: false });
-      const fl = mesh(new THREE.CylinderGeometry(r - 0.06, r - 0.06, h * 0.8, 40), M.fluid, x, 0.45 + h * 0.4, z, { cast: false });
+      mesh(cylGeo(r, r, h, 40, 1, true), M.glass, x, 0.45 + h / 2, z, { cast: false });
+      const fl = mesh(cylGeo(r - 0.06, r - 0.06, h * 0.8, 40), M.fluid, x, 0.45 + h * 0.4, z, { cast: false });
       fl.userData.fluid = true;
-      mesh(new THREE.CylinderGeometry(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x, 0.45 + h + 0.175, z);
+      mesh(cylGeo(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x, 0.45 + h + 0.175, z);
       disc(x, z, r + 0.2, 0.45 + h + 0.35);
       const l = new THREE.PointLight(0x7dff3a, 22, 9, 2);
       l.position.set(x, 1.6, z);
@@ -170,10 +196,10 @@ export function buildLab(scene) {
       // shards of the glass still standing in the collar, the cap thrown off to one side
       for (let i = 0; i < 14; i++) {
         const a = (i / 14) * Math.PI * 2 + R() * 0.2, hh = 0.2 + R() * R() * 1.6;
-        const s = mesh(new THREE.CylinderGeometry(r, r, hh, 4, 1, true, a, 0.35 + R() * 0.15), M.glass, x, 0.45 + hh / 2, z, { cast: false });
+        const s = mesh(cylGeo(r, r, hh, 4, 1, true, a, 0.35 + R() * 0.15), M.glass, x, 0.45 + hh / 2, z, { cast: false });
         s.scale.set(1, 1, 1);
       }
-      const cap = mesh(new THREE.CylinderGeometry(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x + 3.6, 0.5, z - 1.5);
+      const cap = mesh(cylGeo(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x + 3.6, 0.5, z - 1.5);
       cap.rotation.set(0.35, 0, 0.9);
       disc(x, z, r + 0.3, 0.45);
       // the ooze it came out in
@@ -212,6 +238,7 @@ export function buildLab(scene) {
       void m;
     }
     box(x - 0.55, x + 0.55, z0 - 0.31, z0 + (n - 1) * 0.64 + 0.31, 2.1);
+    contact(x, z0 + (n - 1) * 0.32, 1.1, n * 0.64);
   };
   const crateStack = (x, z) => {
     const mat = [M.crateGreen, M.crateGrey, M.crateWood][Math.floor(R() * 3)];
@@ -220,7 +247,8 @@ export function buildLab(scene) {
     if (R() < 0.6) block(x + (R() - 0.5) * 0.2, z + (R() - 0.5) * 0.2, s * 0.9, s * 0.75, s * 0.85, mat, s * 0.85);
   };
   const drum = (x, z, mat) => {
-    mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.92, 20), mat, x, 0.46, z);
+    mesh(cylGeo(0.32, 0.32, 0.92, 20), mat, x, 0.46, z);
+    contact(x, z, 0.64, 0.64, true);
     disc(x, z, 0.32, 0.92);
   };
   const machine = (x, z) => {
@@ -249,7 +277,7 @@ export function buildLab(scene) {
   // containment hall
   tank(-6, -12); tank(6, -12); tank(0, -3, true);
   bench(-4, 13, 7); bench(5, 13, 5);
-  for (let i = 0; i < 5; i++) mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.5, 12), M.drumBlue, 8.6 + (i % 3) * 0.3, 0.75, -20.5 + Math.floor(i / 3) * 0.3);
+  for (let i = 0; i < 5; i++) mesh(cylGeo(0.13, 0.13, 1.5, 12), M.drumBlue, 8.6 + (i % 3) * 0.3, 0.75, -20.5 + Math.floor(i / 3) * 0.3);
   disc(9, -20.3, 0.6, 1.5);
   drum(-8.5, 18, M.drumYellow); drum(-7.8, 18.5, M.drumYellow); drum(-8.6, 19.1, M.drumBlue);
   cable([[-6, -10], [-3, -6], [0, -4.5]]); cable([[6, -10], [3, -6], [1, -4.5]]);
@@ -289,7 +317,7 @@ export function buildLab(scene) {
   // red alarm beacons, sweeping
   const beacons = [];
   const beacon = (x, z, phase) => {
-    mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.3, 16), M.beacon, x, WALL_H + 0.15, z, { cast: false });
+    mesh(cylGeo(0.16, 0.2, 0.3, 16), M.beacon, x, WALL_H + 0.15, z, { cast: false });
     const l = new THREE.SpotLight(0xff2010, 260, 30, 0.42, 0.5, 2);
     l.position.set(x, WALL_H + 0.3, z);
     root.add(l, l.target);
