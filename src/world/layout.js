@@ -50,6 +50,13 @@ export function makeLabLayout(seed = 1337) {
   for (let gx = 0; gx < 4; gx++) for (let gz = 0; gz < 3; gz++) if (R() < 0.8) add('crateStack', { x: 14 + gx * 4.2 + (R() - 0.5), z: 10 + gz * 4 + (R() - 0.5) });
   add('drum', { x: 30, z: 20 }); add('drum', { x: 30.7, z: 19.4 });
 
+  // floor markings: safety rings round the tanks, hatches and drains, walkways and forklift lanes
+  for (const [x, z] of [[-6, -12], [6, -12], [0, -3]]) add('ring', { x, z, r: 2.5 });
+  add('hatch', { x: -6, z: -3 }); add('hatch', { x: 6, z: 5 }); add('hatch', { x: -21, z: -8 }); add('hatch', { x: 21, z: -2 }); add('hatch', { x: 28, z: 12, size: 1.8 });
+  for (const [x, z] of [[-3, 8], [4, -7], [7, 18], [-21, -14.5], [13, -20], [-12.5, 20]]) add('drain', { x, z });
+  add('paint', { x0: 11.5, z0: -12.7, x1: 30.5, z1: -12.7 }); add('paint', { x0: 11.5, z0: -10.2, x1: 30.5, z1: -10.2 });
+  add('paint', { x0: 11.5, z0: 8.2, x1: 30.5, z1: 8.2, w: 0.1, color: 0xd8d8d0 }); add('paint', { x0: 11.5, z0: 20.6, x1: 30.5, z1: 20.6, w: 0.1, color: 0xd8d8d0 });
+
   // lights: a few cast shadows (they cost a render each); the one over the broken tank flickers
   for (const [x, z, shadow, flicker] of [[-24, -13, 1], [-15, -6], [-24, 9, 1], [-15, 16], [0, -2, 1, 1], [0, 11, 1], [-5, -14], [6, -14], [18, -11, 1], [26, -3], [16, 12, 1], [26, 17]]) {
     add('lamp', { x, z, shadow: !!shadow, flicker: !!flicker });

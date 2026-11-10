@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { createMaterials } from './materials.js';
 import * as KIT from './kit.js';
 import { segBox } from './geom.js';
+import { floorMaterial, floorGeometry } from './floors.js';
 
 // Builds a level from a layout (layout.js: plain data, hand-made or generated) and answers the
 // questions the game asks about it:
@@ -55,11 +56,11 @@ export function buildWorld(scene, layout) {
   };
   const contactGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 
-  // ---------------------------------------------------------------- floor
+  // ---------------------------------------------------------------- floors: one slab per room, by type
+  // (and a default slab under everything a room doesn't cover)
   const W = B.x1 - B.x0, D = B.z1 - B.z0;
-  for (const t of [M.floorTex.map, M.floorTex.rough, M.floorTex.normal]) t.repeat.set(W / 16, D / 16);
-  const floor = ctx.mesh(new THREE.PlaneGeometry(W, D), M.floor, (B.x0 + B.x1) / 2, 0, (B.z0 + B.z1) / 2, { cast: false });
-  floor.rotation.x = -Math.PI / 2;
+  ctx.mesh(floorGeometry(B.x0, B.z0, B.x1, B.z1), floorMaterial('default'), 0, -0.01, 0, { cast: false });
+  for (const r of layout.rooms) ctx.mesh(floorGeometry(r.x0, r.z0, r.x1, r.z1), floorMaterial(r.type), 0, 0, 0, { cast: false });
   const voidFloor = ctx.mesh(new THREE.PlaneGeometry(400, 400), M.void, 0, -0.02, 0, { cast: false });
   voidFloor.rotation.x = -Math.PI / 2;
 

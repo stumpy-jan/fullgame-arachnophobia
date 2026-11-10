@@ -9,14 +9,12 @@ export function createMaterials() {
   const worn = (w, color, roughness, metalness, extra = {}) => new THREE.MeshStandardMaterial({
     color, map: w.map, normalMap: w.normal, normalScale: new THREE.Vector2(0.8, 0.8), roughnessMap: w.rough, roughness, metalness, ...extra,
   });
-  const floorT = TX.floorTextures(), wallT = TX.blastWallTextures(), topT = TX.wallTopTextures();
+  const wallT = TX.blastWallTextures(), topT = TX.wallTopTextures();
   const rack = TX.rackTextures(), hazard = TX.hazardTexture();
   hazard.repeat.set(8 / 1.2, 1); // door tapes are 8 m long, a stripe pair every 1.2 m
   const decal = (o) => ({ polygonOffset: true, polygonOffsetFactor: o, polygonOffsetUnits: o });
   const aoMat = (t, o) => new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: t, transparent: true, opacity: o, depthWrite: false, ...decal(-1) });
   return {
-    floorTex: floorT,
-    floor: new THREE.MeshStandardMaterial({ map: floorT.map, roughnessMap: floorT.rough, normalMap: floorT.normal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 1, metalness: 0 }),
     void: new THREE.MeshStandardMaterial({ color: 0x050607, roughness: 1 }),
     wall: new THREE.MeshStandardMaterial({ map: wallT.map, normalMap: wallT.normal, roughnessMap: wallT.rough, roughness: 1, metalness: 0 }),
     wallTop: new THREE.MeshStandardMaterial({ map: topT.map, normalMap: topT.normal, roughnessMap: topT.rough, roughness: 1, metalness: 0 }),

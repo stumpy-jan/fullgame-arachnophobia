@@ -3,6 +3,8 @@ import { boxUV, cylUV } from '../util.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import * as TX from '../textures.js';
 import { splat } from './geom.js';
+import { pbrSet, floorGeometry } from './floors.js';
+import { makeCanvas, fbm, canvasTexture } from '../util.js';
 
 // The level kit: every piece the lab is built from. Each builder takes the build context (ctx, from
 // world.js: the scene root, materials, a seeded random, and the registries for solids, bullet blockers,
@@ -286,4 +288,60 @@ export function beacon(ctx, { x, z, phase = 0 }) {
   ctx.light(l, x, COL_H + 0.3, z);
   ctx.root.add(l.target);
   ctx.beacons.push({ l, x, z, phase });
+}
+
+// ------------------------------------------------------------------ floor markings
+
+// A steel tread-plate access hatch set in the floor, with a painted hazard border.
+export function hatch(ctx, { x, z, size = 1.4 }) {
+  const s = pbrSet('metal_plate', 0.5);
+  const plate = new THREE.MeshStandardMaterial({ map: s.map, normalMap: s.normal, roughnessMap: s.arm, metalnessMap: s.arm, roughness: 1, metalness: 1, color: 0x9a9e9f, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  ctx.mesh(floorGeometry(x - size / 2, z - size / 2, x + size / 2, z + size / 2), plate, 0, 0.006, 0, { cast: false });
+  const tex = ctx.M.hazard.map.clone();
+  tex.repeat.set((size + 0.3) / 1.2, 1);
+  const border = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  for (const [dx, dz, rot] of [[0, -1, 0], [0, 1, 0], [-1, 0, 1], [1, 0, 1]]) {
+    const m = ctx.mesh(new THREE.PlaneGeometry(size + 0.3, 0.15), border, x + dx * (size / 2 + 0.075), 0.005, z + dz * (size / 2 + 0.075), { cast: false });
+    m.rotation.set(-Math.PI / 2, 0, rot ? Math.PI / 2 : 0);
+  }
+}
+
+// A round drain grate.
+export function drain(ctx, { x, z, r = 0.45 }) {
+  const m = ctx.mesh(new THREE.CircleGeometry(r, 32), drainMaterial(), x, 0.006, z, { cast: false });
+  m.rotation.x = -Math.PI / 2;
+}
+let _drain = null;
+function drainMaterial() {
+  if (_drain) return _drain;
+  const [c, g] = makeCanvas(256, 256);
+  g.fillStyle = '#2a2c2d'; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = '#050505';
+  for (let i = -6; i <= 6; i++) g.fillRect(128 + i * 16 - 4, 40, 8, 176);  // slots
+  g.strokeStyle = '#4a4d4f'; g.lineWidth = 14; g.beginPath(); g.arc(128, 128, 118, 0, Math.PI * 2); g.stroke(); // rim
+  return (_drain = new THREE.MeshStandardMaterial({ map: canvasTexture(c, { repeat: false }), roughness: 0.55, metalness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+}
+
+// A worn painted line on the floor from (x0, z0) to (x1, z1), axis-aligned or not.
+export function paint(ctx, { x0, z0, x1, z1, w = 0.12, color = 0xd4a628 }) {
+  const L = Math.hypot(x1 - x0, z1 - z0);
+  const m = ctx.mesh(new THREE.PlaneGeometry(L, w), paintMaterial(color), (x0 + x1) / 2, 0.004, (z0 + z1) / 2, { cast: false });
+  m.rotation.set(-Math.PI / 2, 0, -Math.atan2(z1 - z0, x1 - x0));
+  m.geometry.attributes.uv.array.forEach((v, i, a) => { if (i % 2 === 0) a[i] = v * L / 3; }); // wear texture at 3 m
+}
+// A painted safety ring round something (a tank): yellow, worn.
+export function ring(ctx, { x, z, r = 2.4, w = 0.14, color = 0xd4a628 }) {
+  const m = ctx.mesh(new THREE.RingGeometry(r - w / 2, r + w / 2, 64), paintMaterial(color), x, 0.004, z, { cast: false });
+  m.rotation.x = -Math.PI / 2;
+}
+const _paint = {};
+function paintMaterial(color) {
+  if (_paint[color]) return _paint[color];
+  const S = 512, n = fbm(S, 64, 24, 3, 77);
+  const [c, g] = makeCanvas(S, 64);
+  const img = g.createImageData(S, 64);
+  for (let i = 0; i < S * 64; i++) { const a = n[i] > 0.38 ? 1 : n[i] > 0.3 ? (n[i] - 0.3) / 0.08 : 0; img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = a * 255; img.data[i * 4 + 3] = 255; }
+  g.putImageData(img, 0, 0);
+  const alpha = canvasTexture(c, { srgb: false });
+  return (_paint[color] = new THREE.MeshStandardMaterial({ color, alphaMap: alpha, transparent: true, depthWrite: false, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
 }
