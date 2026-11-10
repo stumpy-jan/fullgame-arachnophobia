@@ -133,11 +133,9 @@ Learnings (what prompts work, what fails) are in `assets/pilot/README.md`.
 ## Where we left off
 
 - On `main`, pushed: everything above.
-- **Not merged, waiting on the user**: the art session's `art/carapace-gear` at `0c710ea`, which replaces the face
-  mask with a spider's eight red-glowing eyes (the mask stays behind a `FACE = 'mask'` switch). The art session
-  reports its attachment check passes. The user hasn't seen it yet. It's a local branch on the old machine and
-  wasn't pushed.
-- **Rejected**: a porcelain face-mask head (`art/porcelain-head`, local only). Don't use it.
+- **Rejected heads**: the user turned down both alternatives to the face mask: a porcelain mask (`art/porcelain-head`) and
+  a spider's eight glowing eyes (`0c710ea`). Both are local branches on the old machine. Don't bring either back; the
+  scan-based face mask stays.
 - Known rough edges: a rare frame where a rear femur goes into the swaying abdomen (up to ~35 cm); the AI lab
   trolley's lower frame is broken (a mesh flaw); the pink spider blood and the pounce ring may be too bright; the
   painted lab floor still shows a faint repeat.
