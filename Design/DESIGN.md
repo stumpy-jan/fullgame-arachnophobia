@@ -88,7 +88,7 @@ Sprinter, Leaper. Glands: Acid trail, Web trail.
   (`src/spill.js`): blood, the vats' pink specimen fluid (also the spider's own blood) and hydraulic oil spread
   round props and stop at walls; blood dries to a dark stain. Sources: spatter from every wound, corpses
   bleeding out into pools, drips from someone being carried, broken vats, wrecked locks (oil). The spider prints
-  footprints after stepping in a pool. Still to do: bullet holes, casings, glass shards.
+  footprints after stepping in a pool. **Battle damage built** (`src/damage.js`): bullet holes chipped into whatever concrete stops a shot (misses fly on into the wall behind), brass casings piling up round the soldiers, glass bursting out of smashed vats (and lying round the start tank), soot burnt into the floor where a lock blows.
 - The monster doesn't grow much: it changes through its mutations (modular, swappable parts).
 
 ## Open questions

@@ -50,10 +50,11 @@ export function sfx(name, gain = 1) {
     case 'land': noise(t, 0.6, 'lowpass', 260, 0.8, 0.8 * k, 0.5); tone(t, 'sine', 65, 25, 0.9 * k, 0.6); break;
     case 'quill': noise(t, 0.25, 'bandpass', 3200, 1.5, 0.18 * k, 0.15); break;
     case 'door': noise(t, 3.2, 'lowpass', 140, 1, 0.6 * k, 3.0); tone(t, 'sawtooth', 48, 40, 0.15 * k, 3.0); break;
+    case 'casing': for (let i = 0; i < 2; i++) tone(t + 0.3 + i * 0.09 + Math.random() * 0.1, 'sine', 3600 + Math.random() * 1800, 3000, 0.035 * k, 0.07); break; // brass on concrete
     case 'squelch': noise(t, 0.3, 'lowpass', 500, 4, 0.5 * k, 0.25); tone(t, 'sine', 140, 50, 0.25 * k, 0.2); break;
   }
 }
-const LIMIT = { step: 0.05, shot: 0.02, metal: 0.06, quill: 0.05, squelch: 0.05 };
+const LIMIT = { casing: 0.04, step: 0.05, shot: 0.02, metal: 0.06, quill: 0.05, squelch: 0.05 };
 
 // the facility hum and the siren, quiet, under everything
 function ambience() {

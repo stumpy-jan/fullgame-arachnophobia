@@ -53,6 +53,8 @@ URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` 
   block it; a fixed floor bumpiness makes pools spread in lobes), drying to stains. The floor shaders read it.
 - Gore: `people.sever` cuts a part off a sculpted rig (`rig.sever`: a stump shows) and throws a clone of it as a
   gib (`updateGibs`: bounces, bleeds, settles lying flat).
+- `src/damage.js`: battle damage that stays: bullet holes (placed by marching the shot through the height field onto
+  the real surface), casings, glass shards, scorch; all instanced ring buffers.
 - `src/fx.js`: pooled tracers, muzzle flashes, sparks, ichor, blood and floor stains.
 - The impale (`spider.strike`): each free leg rises over the nearest person in reach, stabs down (hit-stop,
   camera kick), carries them to the fangs and feeds (+8 health); then steps back down onto a foothold.

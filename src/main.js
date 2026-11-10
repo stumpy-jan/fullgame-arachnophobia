@@ -11,6 +11,7 @@ import { softDot } from './textures.js';
 import { damp, clamp } from './util.js';
 import { FX } from './fx.js';
 import { Spill } from './spill.js';
+import { Damage } from './damage.js';
 import { People } from './people/people.js';
 import { Hud } from './hud.js';
 import { sfx, falloff, audioOpts } from './audio.js';
@@ -62,6 +63,9 @@ const fx = new FX(scene);
 // liquids on the floor: blood, specimen fluid, oil (spill.js); everything that bleeds or breaks adds to it
 const spill = new Spill(renderer, lab);
 fx.spill = spill;
+// battle damage: bullet holes, casings, glass, scorch (damage.js); the start bay's smashed tank has its glass round it
+const damage = new Damage(scene, lab);
+for (const pc of lab.layout.pieces) if (pc.type === 'tank' && pc.broken) damage.scatter(pc.x, pc.z, 70, 3.2);
 const people = Q.has('nopeople') || GYM ? null : new People(scene, lab, spider, fx);
 const state = { hp: 100, kills: 0, over: false, hurt: 0, log: [] };
 const hud = new Hud();
@@ -184,6 +188,7 @@ function hitLock(L, d) {
   for (let i = 0; i < 4; i++) fx.burst(new THREE.Vector3(L.x, L.h * 0.6, L.z), 'spark', 30);
   // its fluids out across the floor: the pumps' hydraulic oil (a lot), the generator's (a little)
   spill.add(L.x, L.z, L.kind === 'pumps' ? 2.4 : 1.4, 0, 0, L.kind === 'pumps' ? 3 : 1.2);
+  damage.scorch(L.x, L.z, 2.8);
   shake = 1.4; hitStop = 0.08;
   sfx('boom');
   if (lab.locks.every((o) => o.destroyed) && lab.door) { lab.door.unlocked = true; hud.notice('THE DOOR IS OPEN'); sfx('door'); }
@@ -211,6 +216,7 @@ function updateGoal(dt) {
 
 // footprints: a foot that steps in a pool soaks some up and prints it on the next few steps (spill.js)
 const feetWet = new Map();
+const _shotDir = new THREE.Vector3(), _shotFar = new THREE.Vector3();
 function footprint(e) {
   if (e.pos.y > 0.25) return; // (on a bench or a wall top: the spill only covers the floor)
   const key = e.k * 2 + (e.s > 0 ? 1 : 0), w = feetWet.get(key) || [0, 0], [b, i] = spill.wetAt(e.pos.x, e.pos.z);
@@ -228,6 +234,7 @@ function breakVat(b) {
   fx.burst(p, 'spark', 30); fx.burst(p, 'ichor', 24);
   // the vat empties across the floor
   spill.add(b.x, b.z, 1.8, 0, 4);
+  damage.shards(b.x, 0.35, b.z, 45, _shotDir.set(b.x - spider.pos.x, 0, b.z - spider.pos.z).normalize());
   for (let i = 0; i < 5; i++) { const a = Math.random() * 6.28, r = 1 + Math.random() * 1.2; spill.add(b.x + Math.cos(a) * r, b.z + Math.sin(a) * r, 0.5 + Math.random() * 0.4, 0, 0.6); }
   shake = Math.min(1, shake + 0.5);
   sfx('glass');
@@ -281,7 +288,18 @@ function frame(now) {
     if (people) {
       people.update(dt, time);
       for (const e of people.events) {
-        if (e.type === 'shot') sfx('shot', falloff(e.from.x, e.from.z, spider.pos.x, spider.pos.z));
+        if (e.type === 'shot') {
+          const vol = falloff(e.from.x, e.from.z, spider.pos.x, spider.pos.z);
+          sfx('shot', vol); sfx('casing', vol * 0.6);
+          const dir = _shotDir.subVectors(e.to, e.from).normalize();
+          damage.casing(e.from, dir);
+          if (e.blocked) damage.hole(e.from, e.to);
+          else if (!e.hit) { // a miss flies on, into whatever is behind
+            _shotFar.copy(e.to).addScaledVector(dir, 25);
+            const t = lab.shotHit(e.to, _shotFar);
+            if (t >= 0) damage.hole(e.to, _shotFar.lerpVectors(e.to, _shotFar, t));
+          }
+        }
         if (e.type === 'shot' && e.hit) fx.burst(new THREE.Vector3(e.to.x, e.to.y, e.to.z), 'ichor', 4, new THREE.Vector3(0, 0.5, 0)); // the spider bleeds its own pink
         if (e.type === 'shot' && e.hit && !state.over && !Q.has('god')) { state.hp -= e.damage; state.hurt = 1; state.lastHurt = time; shake = Math.min(0.8, shake + 0.08); }
       }
@@ -292,6 +310,7 @@ function frame(now) {
     if (time - (state.lastHurt ?? -9) > 3) state.hp = Math.min(100, state.hp + 2.5 * dt);
     fx.update(dt);
     spill.update(dt);
+    damage.update(dt);
   }
   // hurt: a red pulse in the post pass
   state.hurt = Math.max(0, state.hurt - real * 4);
@@ -313,4 +332,4 @@ updateCamera(1, 0);
 requestAnimationFrame(frame);
 
 // for tools and the console
-window.game = { seed: SEED, spill, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };
+window.game = { seed: SEED, spill, damage, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };
