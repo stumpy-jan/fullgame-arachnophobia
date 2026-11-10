@@ -40,9 +40,13 @@ procedural part filled, under the spider's own satin material). What we learned:
 
 ## Soldier gear (hood v2, air tank, rifle)
 
-Rigid parts for the sculpted soldier: hood on the head bone, tank on the chest bone, rifle in the gun group. They're
-tried on in the zoo only (`zoo.html?stage=3&view=gear`, `&turn=` for the heading); `sculpted.js` doesn't use them yet.
-Mounts are in `GEAR` in `src/zoo/zoo.js`. Each part is counter-scaled for the body's scale and placed by its centre.
+Rigid parts for the sculpted soldier, worn in `src/people/sculpted.js` (`GEAR`: model, bone-local centre, turn, colour
+scale): the hood on the head bone, the tank on the chest bone, the rifle in the gun group (the flash and laser move to its
+muzzle). Each is counter-scaled for the body's scale and placed by its centre. They're used once loaded
+(`loadModels(renderer, [...GEAR_MODELS])`), else the procedural parts stay; `sculpted(type, { gear: false })` keeps them
+too. Clones share geometry and materials, so `RigRenderer` batches them: one draw per part for every soldier. Before
+and after in the zoo: `zoo.html?stage=3&view=gear` (`&turn=` for the heading). The rifle is darkened (colour 0.4): in
+the lab's light its baked metal read silver.
 
 - Hood v2 (`img_61_0`): "covers only the head ... ending in a short gathered ruff at the neck, no shoulders". v1 had
   shoulders, which would clip when the head turns. 2,000 tris. Two colour zones (yellow fabric first, so a missed
