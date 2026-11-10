@@ -18,6 +18,11 @@ export const MUTATIONS = {
       const g = new THREE.Group();
       for (const s of [-1, 1]) {
         const m = new THREE.Group(); m.position.set(s * 0.2, -0.08, 1.02); g.add(m);
+        const ai = sp.mutationPart('maw_mandible', MANDIBLE.size, MANDIBLE.k); // (the AI part when loaded: assets/pilot/maw_mandible)
+        if (ai) {
+          ai.scale.x *= s; ai.position.set(...MANDIBLE.pos); ai.position.x *= s; ai.rotation.set(MANDIBLE.tilt, s * MANDIBLE.turn, 0);
+          m.add(ai); sp.mawJaws.push(m); continue;
+        }
         const base = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), sp.mat.chitin); base.scale.set(0.17, 0.3, 0.22); m.add(base);
         for (let i = 0; i < 3; i++) {
           const t = new THREE.Mesh(new THREE.ConeGeometry(0.07 - i * 0.015, 0.5 - i * 0.1, 8), sp.mat.leg);
@@ -34,6 +39,12 @@ export const MUTATIONS = {
     slot: 'abdomen', name: 'Rear quills',
     text: 'Automatic: spines fire from your abdomen at anyone behind you. Walls stop them.',
     part: (sp) => { // a ridge of quills along the top and back of the abdomen, raking backwards
+      const ridge = sp.mutationPart('abdomen_quills', QUILLS.size, QUILLS.k); // (the AI part when loaded: assets/pilot/abdomen_quills)
+      if (ridge) {
+        ridge.position.set(...QUILLS.pos); ridge.rotation.x = QUILLS.tilt; sp.quillMeshes = [];
+        sp.mounts.abdomen.add(ridge);
+        return () => { sp.mounts.abdomen.remove(ridge); };
+      }
       const g = new THREE.Group(), geo = new THREE.ConeGeometry(0.05, 0.85, 6).translate(0, 0.425, 0);
       const bone = new THREE.MeshStandardMaterial({ color: 0xd2c2a8, roughness: 0.45 }); // pale bone: the mutation has to read at a glance
       sp.quillMeshes = [];
@@ -83,7 +94,58 @@ export const MUTATIONS = {
     },
     power: (sp, ctx) => sp.pounce(ctx.aim.x, ctx.aim.z),
   },
+  scythes: {
+    slot: 'forelegs', name: 'Scythes', cooldown: 6, slashDmg: 3,
+    text: 'E: reap: one wide sweep of bone blades cuts down everyone in front within 6 m. Your slash cuts deeper too: soldiers fall to one blow.',
+    part: (sp) => { // bone sickles along the front tibias (the AI part; procedural blades until it loads)
+      const before = sp.legs.filter((l) => l.k <= 1).map((l) => l.tibia.children.length);
+      const undo = scytheParts(sp);
+      if (sp.legs.filter((l) => l.k <= 1).some((l, i) => l.tibia.children.length > before[i])) return undo;
+      const added = [];
+      for (const l of sp.legs) {
+        if (l.k > 1) continue;
+        const blade = new THREE.Mesh(new THREE.ConeGeometry(0.05, 1.7, 4).translate(0, 0.85, 0), new THREE.MeshStandardMaterial({ color: 0xe0d2b8, roughness: 0.35 }));
+        blade.scale.set(1, 1, 3.2); blade.position.set(0, 0.5, 0.12); blade.rotation.x = 0.25;
+        l.tibia.add(blade); added.push([l.tibia, blade]);
+      }
+      return () => { undo(); for (const [q, c] of added) q.remove(c); };
+    },
+    power: (sp, ctx) => {
+      const P = ctx.people;
+      if (!P) return false;
+      const fx = Math.sin(sp.heading), fz = Math.cos(sp.heading);
+      for (const h of P.list) {
+        if (!P.alive(h)) continue;
+        const dx = h.x - sp.pos.x, dz = h.z - sp.pos.z, d = Math.hypot(dx, dz);
+        if (d > 6.2 || (d > 0.5 && (dx * fx + dz * fz) / d < -0.35)) continue; // a 220-degree sweep in front
+        if (ctx.world.shotHit(_A.set(sp.pos.x, 1.5, sp.pos.z), _B.set(h.x, 1.2, h.z)) >= 0) continue; // not through concrete
+        P.hit(h, 3, new THREE.Vector3(dx, 0, dz));
+      }
+      ctx.fx?.swipe(sp.pos, sp.heading, 5.6, 1.5, 3.8); ctx.fx?.swipe(sp.pos, sp.heading, 4.2, 1.1, 3.8);
+      sfx('slash'); sfx('slash', 0.8);
+      ctx.onReap?.();
+      return true;
+    },
+  },
 };
+
+// AI part placement (assets/pilot; spider.mutationPart fits each to its box): box (m), where its centre goes, tilt
+const MANDIBLE = { size: new THREE.Vector3(0.36, 0.16, 1.0), pos: [0.06, -0.02, 0.48], tilt: 0.15, turn: 0.2, k: 0.6 };
+const QUILLS = { size: new THREE.Vector3(1.1, 0.34, 1.9), pos: [0, 0.66, -0.1], tilt: 0.12, k: 1.15 };
+const SCYTHE = { size: new THREE.Vector3(0.14, 1.9, 0.6), pos: [0, 1.2, 0.18], k: 1.25 };
+
+// Scythes (forelegs, proposed): a bone sickle along each front tibia. The part only: the mutation is gameplay's.
+export function scytheParts(sp) {
+  const added = [];
+  for (const l of sp.legs) {
+    if (l.k > 1) continue;
+    const b = sp.mutationPart('foreleg_scythe', SCYTHE.size, SCYTHE.k);
+    if (!b) continue;
+    b.position.set(...SCYTHE.pos);
+    l.tibia.add(b); added.push([l.tibia, b]);
+  }
+  return () => { for (const [p, c] of added) p.remove(c); };
+}
 
 // The run's mutation state: which slot holds what, cooldowns, auto-power state, and the quills in flight.
 export class Mutations {
@@ -168,4 +230,5 @@ class Quills {
   }
 }
 
+const _A = new THREE.Vector3(), _B = new THREE.Vector3();
 const _F = new THREE.Vector3(), _T = new THREE.Vector3(), _G = new THREE.Vector3(), _D = new THREE.Vector3(), _S = new THREE.Vector3();

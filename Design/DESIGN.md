@@ -61,7 +61,9 @@ The body is built from **six swappable slots**, each a part made in code:
 
 **First three to build:** **Devour** (Maw, triggered, 8 s: grab the nearest person, eat, fast heal),
 **Rear quills** (Abdomen, auto: spines at anyone behind you), **Pounce** (Forelegs, triggered, 10 s: leap onto a
-spot, stun everyone there).
+spot, stun everyone there). **Built since:** **Scythes** (Forelegs, triggered, 6 s: reap, a 220-degree sweep out to
+6 m that cuts down everyone it reaches, walls permitting; passively the slash kills soldiers in one). The
+mutation parts are AI-made (mandibles, quill ridge, scythes; the art session), procedural until they load.
 
 **The wider list** (proposed): Maw: Screech, Acid spit. Forelegs: Scythes, Hooked claws. Carapace: Armour
 plates (less damage from the front), Shock ridge, Quill volley. Abdomen: Brood sac, Gas bladder. Hind legs:

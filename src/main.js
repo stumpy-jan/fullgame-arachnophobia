@@ -5,7 +5,7 @@ import { makeLabLayout } from './world/layout.js';
 import { makeGymLayout } from './world/gym.js';
 import { makeFacility } from './world/generate.js';
 import { loadModels } from './world/models.js';
-import { Spider } from './spider.js';
+import { Spider, MUTATION_PARTS } from './spider.js';
 import { Post, postParams } from './post.js';
 import { softDot } from './textures.js';
 import { damp, clamp } from './util.js';
@@ -49,7 +49,7 @@ scene.fog = new THREE.FogExp2(0x030506, 0.012);
 const VERSIONS = { procedural: 'Procedural', abdomen: 'AI abdomen', carapace: 'AI carapace', both: 'AI both' };
 const VERSION_PARTS = { procedural: [], abdomen: ['spider_abdomen'], carapace: ['spider_thorax'], both: ['spider_abdomen', 'spider_thorax'] };
 const version = VERSIONS[Q.get('spider')] ? Q.get('spider') : Q.has('classic') ? 'procedural' : 'both';
-await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version], ...(Q.has('nogear') ? [] : GEAR_MODELS)]); // (the soldiers' AI-made hood, tank and rifle; ?nogear: procedural)
+await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version], ...(Q.has('nogear') ? [] : GEAR_MODELS), ...MUTATION_PARTS]); // (the soldiers' AI-made hood, tank and rifle; ?nogear: procedural)
 // ?gym: an obstacle course with nobody in it, for moving the spider around (world/gym.js)
 const GYM = Q.has('gym');
 if (GYM) audioOpts.siren = false;
@@ -152,7 +152,7 @@ addEventListener('mousemove', (e) => mouse.set((e.clientX / innerWidth) * 2 - 1,
 
 // mutations: one per body slot, fixed keys per slot (mutations.js); ?mut=devour,quills,pounce to start with some
 const mutations = new Mutations(scene, spider, fx);
-const ctx = { people, world: lab, aim, quills: mutations.quills };
+const ctx = { people, world: lab, aim, quills: mutations.quills, fx, onReap: () => { shake = Math.min(1.4, shake + 0.7); hitStop = 0.07; } };
 for (const id of (Q.get('mut') || '').split(',').filter(Boolean)) if (MUTATIONS[id]) mutations.take(id);
 let choosing = null; // the offer on screen (the game waits)
 function pick(i) {
@@ -340,7 +340,7 @@ function frame(now) {
       if (meal) {
         feedT += dt; state.hp = Math.min(100, state.hp + 30 * dt);
         if (feedT > 1.6) { people.consume(meal); feedT = 0; }
-      } else { feedT = 0; spider.autoSlash(people, { targets: lockTargets }); }
+      } else { feedT = 0; spider.autoSlash(people, { targets: lockTargets, dmg: MUTATIONS[mutations.have.forelegs]?.slashDmg ?? 2 }); }
       mutations.update(dt, ctx);
     }
     for (const e of spider.events) {

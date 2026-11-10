@@ -24,3 +24,4 @@ tools/_vat.mjs
 tools/_battle.mjs
 tools/_menus.mjs
 tools/_powers.mjs
+tools/_reap.mjs

@@ -123,11 +123,12 @@ export class FX {
     this.burst(p, pink ? 'ichormist' : 'mist', Math.round(3 * k), dir ? _v.copy(dir).multiplyScalar(0.4) : null, 0.6);
   }
 
-  swipe(c, yaw, r = 3.2, h = 1.6) {
-    // a fan of bright dots along a 130-degree arc in front, swept quickly so it reads as a stroke
-    for (let k = 0; k < 26; k++) {
-      const a = yaw - 1.13 + (k / 25) * 2.26, rr = r * (0.92 + this.R() * 0.12);
-      _v.set(c.x + Math.sin(a) * rr, h + Math.sin((k / 25) * Math.PI) * 0.5, c.z + Math.cos(a) * rr);
+  swipe(c, yaw, r = 3.2, h = 1.6, arc = 2.26) {
+    // a fan of bright dots along an arc in front (130 degrees unless told), swept quickly so it reads as a stroke
+    const n = Math.round((26 * arc) / 2.26);
+    for (let k = 0; k < n; k++) {
+      const a = yaw - arc / 2 + (k / (n - 1)) * arc, rr = r * (0.92 + this.R() * 0.12);
+      _v.set(c.x + Math.sin(a) * rr, h + Math.sin((k / (n - 1)) * Math.PI) * 0.5, c.z + Math.cos(a) * rr);
       _w.set(Math.cos(a), 0, -Math.sin(a)).multiplyScalar(-3);
       this.dot(_v, 'swipe', _w);
     }

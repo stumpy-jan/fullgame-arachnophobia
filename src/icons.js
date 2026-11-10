@@ -21,4 +21,6 @@ export const MUTATION_ICONS = {
   pounce: S('<path d="M4 15C6 6 14 4 19 12"/><path d="M16.5 11.5l2.8.6.4-2.9"/><path d="M14 19.5c1-1 2.6-1.6 4.5-1.6s3.5.6 4.5 1.6" transform="translate(-4 0)"/><path d="M9 17l-1.5-1.5M15 17l1.5-1.5"/>'),
 };
 
+MUTATION_ICONS.scythes = S('<path d="M5 20C5 11 9 5 18 3c-4 4-6 8-6 13"/><path d="M19 20c0-9-4-15-13-17 4 4 6 8 6 13" opacity="0.7"/>');
+
 export function icon(id, slot) { return MUTATION_ICONS[id] || SLOT_ICONS[slot] || SLOT_ICONS.maw; }
