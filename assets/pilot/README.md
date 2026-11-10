@@ -19,7 +19,7 @@ procedural part filled, under the spider's own satin material). What we learned:
 - The mesher invents the side the image doesn't show, and sometimes leaves it open: two of three abdomen meshes
   had a hollow front end. Render every raw mesh from all sides (front, back, both flanks) before finishing.
 - Spines and bristles widen the bounding box, so `aiPart` fits the 3rd to 97th percentile of the vertices.
-- In use: the abdomen (`img_33_3`). The carapace (`img_45_3`, `?carapace`) still reads glassy next to the face mask.
+- In use: the abdomen (`img_33_3`) and the carapace v2 (`img_77_0`, painted from straight above). `?spider=procedural|abdomen|carapace` for the others.
 
 ## Carapace v2 (top-down)
 

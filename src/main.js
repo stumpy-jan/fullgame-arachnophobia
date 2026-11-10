@@ -43,10 +43,10 @@ scene.fog = new THREE.FogExp2(0x030506, 0.012);
 
 // the level: a layout (plain data; hand-made now, generated later) built into meshes + query services
 // (the AI-made models first: the kit places them as it builds)
-// which spider: ?spider=procedural|abdomen|carapace|both (the gym has buttons for them); the game uses the AI abdomen
+// which spider: ?spider=procedural|abdomen|carapace|both (the gym has buttons for them); the game uses both AI parts
 const VERSIONS = { procedural: 'Procedural', abdomen: 'AI abdomen', carapace: 'AI carapace', both: 'AI both' };
 const VERSION_PARTS = { procedural: [], abdomen: ['spider_abdomen'], carapace: ['spider_thorax'], both: ['spider_abdomen', 'spider_thorax'] };
-const version = VERSIONS[Q.get('spider')] ? Q.get('spider') : Q.has('classic') ? 'procedural' : Q.has('carapace') ? 'both' : 'abdomen';
+const version = VERSIONS[Q.get('spider')] ? Q.get('spider') : Q.has('classic') ? 'procedural' : 'both';
 await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version], ...(Q.has('nogear') ? [] : GEAR_MODELS)]); // (the soldiers' AI-made hood, tank and rifle; ?nogear: procedural)
 // ?gym: an obstacle course with nobody in it, for moving the spider around (world/gym.js)
 const GYM = Q.has('gym');
