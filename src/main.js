@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWorld } from './world/world.js';
 import { makeLabLayout } from './world/layout.js';
+import { makeGymLayout } from './world/gym.js';
 import { loadModels } from './world/models.js';
 import { Spider, SPIDER_PARTS } from './spider.js';
 import { Post, postParams } from './post.js';
@@ -39,14 +40,16 @@ scene.fog = new THREE.FogExp2(0x030506, 0.012);
 // the level: a layout (plain data; hand-made now, generated later) built into meshes + query services
 // (the AI-made models first: the kit places them as it builds)
 await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...(Q.has('classic') ? [] : SPIDER_PARTS), ...(Q.has('carapace') ? ['spider_thorax'] : [])]); // (?classic: the procedural spider)
-const lab = buildWorld(scene, makeLabLayout());
+// ?gym: an obstacle course with nobody in it, for moving the spider around (world/gym.js)
+const GYM = Q.has('gym');
+const lab = buildWorld(scene, GYM ? makeGymLayout() : makeLabLayout());
 const spider = new Spider(scene, lab);
 spider.place(lab.spawn.x, lab.spawn.z, lab.spawn.heading);
 if (Q.get('at')) { const [x, z, h] = Q.get('at').split(',').map(Number); spider.place(x, z, h || 0); }
 
 // the people (?nopeople: an empty lab), effects, the game's state
 const fx = new FX(scene);
-const people = Q.has('nopeople') ? null : new People(scene, lab, spider, fx);
+const people = Q.has('nopeople') || GYM ? null : new People(scene, lab, spider, fx);
 const state = { hp: 100, kills: 0, over: false, hurt: 0, log: [] };
 const hud = new Hud();
 

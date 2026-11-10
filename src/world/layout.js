@@ -87,7 +87,8 @@ export function makeLabLayout(seed = 1337) {
       { id: 'storage', type: 'storage', x0: 10, x1: 32, z0: 6, z1: 22 },
     ],
     walls: [
-      { x0: -32, z0: -22, x1: -3.5, z1: -22, outer: true }, { x0: 3.5, z0: -22, x1: 32, z1: -22, outer: true }, // (the exit door between) { x0: -32, z0: 22, x1: 32, z1: 22, outer: true },
+      { x0: -32, z0: -22, x1: -3.5, z1: -22, outer: true }, { x0: 3.5, z0: -22, x1: 32, z1: -22, outer: true }, // (the exit door between)
+      { x0: -32, z0: 22, x1: 32, z1: 22, outer: true },
       { x0: -32, z0: -22, x1: -32, z1: 22, outer: true }, { x0: 32, z0: -22, x1: 32, z1: 22, outer: true },
       { x0: -10, z0: -22, x1: -10, z1: -4 }, { x0: -10, z0: 4, x1: -10, z1: 22 },
       { x0: 10, z0: -22, x1: 10, z1: -7 }, { x0: 10, z0: 1, x1: 10, z1: 22 },
