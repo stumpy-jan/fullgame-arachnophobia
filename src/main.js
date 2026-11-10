@@ -13,6 +13,7 @@ import { FX } from './fx.js';
 import { Spill } from './spill.js';
 import { Damage } from './damage.js';
 import { People } from './people/people.js';
+import { GEAR_MODELS } from './people/sculpted.js';
 import { Hud } from './hud.js';
 import { sfx, falloff, audioOpts } from './audio.js';
 import { Mutations, MUTATIONS, SLOTS, SLOT_NAMES, SLOT_KEYS } from './mutations.js';
@@ -46,7 +47,7 @@ scene.fog = new THREE.FogExp2(0x030506, 0.012);
 const VERSIONS = { procedural: 'Procedural', abdomen: 'AI abdomen', carapace: 'AI carapace', both: 'AI both' };
 const VERSION_PARTS = { procedural: [], abdomen: ['spider_abdomen'], carapace: ['spider_thorax'], both: ['spider_abdomen', 'spider_thorax'] };
 const version = VERSIONS[Q.get('spider')] ? Q.get('spider') : Q.has('classic') ? 'procedural' : Q.has('carapace') ? 'both' : 'abdomen';
-await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version]]);
+await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version], ...(Q.has('nogear') ? [] : GEAR_MODELS)]); // (the soldiers' AI-made hood, tank and rifle; ?nogear: procedural)
 // ?gym: an obstacle course with nobody in it, for moving the spider around (world/gym.js)
 const GYM = Q.has('gym');
 if (GYM) audioOpts.siren = false;
