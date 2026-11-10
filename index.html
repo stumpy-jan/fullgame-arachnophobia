@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arachnophobia</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    canvas { display: block; }
+    #hud { position: fixed; left: 16px; bottom: 14px; color: #8fa3a6; font: 12px/1.5 ui-monospace, Consolas, monospace;
+      letter-spacing: 0.04em; opacity: 0.75; pointer-events: none; text-shadow: 0 1px 2px #000; }
+    .shot #hud { display: none; }
+  </style>
+</head>
+<body>
+  <div id="hud">WASD / arrows move &middot; Shift scuttle &middot; P autopilot &middot; 1 post on/off</div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
