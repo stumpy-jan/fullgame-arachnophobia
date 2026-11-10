@@ -17,7 +17,8 @@ const browser = await chromium.launch({ executablePath: exe, headless: true, arg
 const page = await browser.newPage({ viewport: { width: +W, height: +H } });
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log(`[page ${m.type()}]`, m.text()); });
 page.on('pageerror', (e) => console.log('[page error]', e.message));
-await page.goto(`http://localhost:${port}/?shot&${query}`);
+// PAGE=zoo.html for the zoo
+await page.goto(`http://localhost:${port}/${process.env.PAGE || ''}?shot&${query}`);
 await page.waitForFunction(() => window.game, null, { timeout: 30000 });
 const t0 = Date.now();
 for (const t of times.split(',').map(Number)) {
