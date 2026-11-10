@@ -1,0 +1,12 @@
+import { chromium } from 'playwright-core';
+const [query = '', out = 'shots/probe.png', t = '4', js = ''] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+page.on('pageerror', (e) => console.log('[err]', e.message));
+page.on('console', (m) => { if (m.type() === 'error') console.log('[console]', m.text()); });
+await page.goto('http://localhost:5391/?shot&' + query);
+await page.waitForFunction(() => window.game);
+if (js) console.log(await page.evaluate(js));
+await page.waitForFunction((t) => window.game.time >= t, +t);
+await page.screenshot({ path: out });
+await browser.close();

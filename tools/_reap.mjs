@@ -1,0 +1,15 @@
+import { chromium } from 'playwright-core';
+const [query] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+page.on('pageerror', (e) => console.log('[err]', e.message));
+await page.goto('http://localhost:5391/?shot&' + query);
+await page.waitForFunction(() => window.game && window.game.time > 4);
+await page.mouse.move(800, 300);
+const before = await page.evaluate(() => { const P = game.people, sp = game.spider; const fx = Math.sin(sp.heading), fz = Math.cos(sp.heading); P.list.filter((h) => P.alive(h)).slice(0, 4).forEach((h, i) => { h.x = sp.pos.x + fx * 3.5 + (i - 1.5) * 1.6 * fz; h.z = sp.pos.z + fz * 3.5 - (i - 1.5) * 1.6 * fx; h.stunT = 3; }); return P.list.filter((h) => !P.alive(h)).length; }); await page.keyboard.press('KeyE');
+let t = await page.evaluate(() => game.time); await page.waitForFunction((t) => game.time > t + 0.08, t);
+await page.screenshot({ path: 'shots/vfx_reap.png' }); console.log('reaped', (await page.evaluate(() => game.people.list.filter((h) => !game.people.alive(h)).length)) - before);
+t = await page.evaluate(() => game.time); await page.waitForFunction((t) => game.time > t + 3, t);
+await page.screenshot({ path: 'shots/vfx_quills.png' });
+console.log('quills alive', await page.evaluate(() => game.mutations.quills.list.length));
+await browser.close();

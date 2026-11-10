@@ -1,0 +1,23 @@
+// the run's frame, headless: title -> play -> pause -> settings -> die -> summary
+import { chromium } from 'playwright-core';
+const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+page.on('pageerror', (e) => console.log('[err]', e.message));
+page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) console.log('[console]', m.text()); });
+const t0 = Date.now();
+await page.goto('http://localhost:5391/?seed=1');
+await page.waitForFunction(() => !document.getElementById('veil'), null, { timeout: 120000 });
+console.log('veil lifted after', ((Date.now() - t0) / 1000).toFixed(1), 's');
+await page.waitForTimeout(1500); await page.screenshot({ path: 'shots/ui_title.png' });
+await page.click('button[data-a=start]'); await page.waitForTimeout(2500);
+const p0 = await page.evaluate(() => game.spider.pos.z); await page.keyboard.down('KeyW'); await page.waitForTimeout(1200); await page.keyboard.up('KeyW'); console.log('moved', (await page.evaluate(() => game.spider.pos.z)) - p0);
+await page.screenshot({ path: 'shots/ui_play.png' });
+await page.mouse.move(800, 860); await page.waitForTimeout(300);
+const box = await page.evaluate(() => { const r = document.querySelector('#slots .s').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
+await page.mouse.move(box[0], box[1]); await page.waitForTimeout(300); await page.screenshot({ path: 'shots/ui_tip.png' });
+await page.keyboard.press('Escape'); await page.waitForTimeout(800); await page.screenshot({ path: 'shots/ui_pause.png' });
+await page.click('button[data-a=settings]'); await page.waitForTimeout(800); await page.screenshot({ path: 'shots/ui_settings.png' });
+await page.keyboard.press('Escape'); await page.waitForTimeout(400); await page.keyboard.press('Escape'); await page.waitForTimeout(600);
+console.log('mode after resume: hud', await page.evaluate(() => document.documentElement.classList.contains('hudon')));
+await page.evaluate(() => { game.state.hp = -5; }); await page.waitForTimeout(2500); await page.screenshot({ path: 'shots/ui_end.png' });
+await browser.close();

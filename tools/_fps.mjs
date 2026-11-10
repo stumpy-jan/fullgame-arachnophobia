@@ -1,0 +1,10 @@
+import { chromium } from 'playwright-core';
+const [query = ''] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+page.on('pageerror', (e) => console.log('[err]', e.message));
+await page.goto('http://localhost:5391/?play&' + query);
+await page.waitForFunction(() => window.game && window.game.time > 2, null, { timeout: 60000 });
+const r = await page.evaluate(() => new Promise((res) => { const t = []; let last = performance.now(); const f = (n) => { t.push(n - last); last = n; if (t.length < 240) requestAnimationFrame(f); else { t.sort((a, b) => a - b); res({ avg: (t.reduce((a, b) => a + b) / t.length).toFixed(1), p95: t[Math.floor(t.length * 0.95)].toFixed(1), max: t[t.length - 1].toFixed(1), people: game.people ? game.people.list.length : 0 }); } }; requestAnimationFrame(f); }));
+console.log(query, JSON.stringify(r));
+await browser.close();

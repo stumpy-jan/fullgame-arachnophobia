@@ -1,0 +1,15 @@
+import { chromium } from 'playwright-core';
+const [query] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+page.on('pageerror', (e) => console.log('[err]', e.message));
+await page.goto('http://localhost:5391/?shot&' + query);
+await page.waitForFunction(() => window.game && window.game.time > 4);
+await page.mouse.move(800, 300);
+await page.keyboard.press('KeyE');
+let t = await page.evaluate(() => game.time); await page.waitForFunction((t) => game.time > t + 0.75, t);
+await page.screenshot({ path: 'shots/vfx_pounce.png' });
+t = await page.evaluate(() => game.time); await page.waitForFunction((t) => game.time > t + 3, t);
+await page.screenshot({ path: 'shots/vfx_quills.png' });
+console.log('quills alive', await page.evaluate(() => game.mutations.quills.list.length));
+await browser.close();

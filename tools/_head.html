@@ -1,0 +1,22 @@
+<!doctype html><html><body><script type="module">
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+new GLTFLoader().load('../models/LeePerrySmith.glb', (g) => {
+  let geo; g.scene.traverse((o) => { if (o.isMesh) geo = o.geometry; });
+  const p = geo.attributes.position, rows = {};
+  // front surface profile: for y bands, the max z per x bin (the face's front)
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    if (z < 0.5) continue;
+    const yb = Math.round(y * 4) / 4, xb = Math.round(x * 4) / 4;
+    if (yb < 0.75 || yb > 2.75 || Math.abs(xb) > 2.5) continue;
+    const r = (rows[yb] ||= {});
+    r[xb] = Math.max(r[xb] ?? -9, z);
+  }
+  const out = [];
+  for (const yb of Object.keys(rows).map(Number).sort((a, b) => b - a)) {
+    const r = rows[yb];
+    out.push(yb.toFixed(2) + ': ' + Object.keys(r).map(Number).sort((a, b) => a - b).filter((x) => x >= 0).map((x) => `${x}:${r[x].toFixed(2)}`).join(' '));
+  }
+  window.headInfo = out;
+});
+</script></body></html>

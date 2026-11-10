@@ -2,9 +2,6 @@ node_modules
 dist
 shots
 .DS_Store
-tools/_probe.mjs
-tools/_kills.mjs
-tools/_head.html
 tools/bin
 assets/pilot/*/raw_*.glb
 assets/pilot/*/work/
@@ -14,14 +11,3 @@ assets/pilot/*/*_metallic.png
 assets/pilot/*/*_normal.png
 assets/pilot/*/*_roughness.png
 assets/pilot/*/*.glb
-tools/_gym.mjs
-tools/_svg2png.mjs
-tools/_fps.mjs
-tools/_gore.mjs
-tools/_gore2.mjs
-tools/_gibtrace.mjs
-tools/_vat.mjs
-tools/_battle.mjs
-tools/_menus.mjs
-tools/_powers.mjs
-tools/_reap.mjs

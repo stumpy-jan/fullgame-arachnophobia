@@ -1,0 +1,17 @@
+import { chromium } from 'playwright-core';
+const [query, out] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+page.on('pageerror', (e) => console.log('[err]', e.message));
+await page.goto('http://localhost:5391/?shot&' + query);
+await page.waitForFunction(() => window.game && window.game.time > 1);
+const v = await page.evaluate(() => { const b = game.lab.breakables[0]; game.spider.place(b.x - 2, b.z, Math.PI / 2); return [b.x, b.z]; });
+await page.waitForTimeout(1500);
+await page.evaluate(() => game.pick(0));
+let t = await page.evaluate(() => game.time); await page.waitForFunction((t) => game.time > t + 4, t);
+await page.screenshot({ path: out + '_a.png' });
+t = await page.evaluate(() => game.time); await page.keyboard.down('KeyD'); await page.waitForFunction((t) => game.time > t + 2.2, t); await page.keyboard.up('KeyD');
+t = await page.evaluate(() => game.time); await page.waitForFunction((t) => game.time > t + 0.6, t);
+await page.screenshot({ path: out + '_b.png' });
+console.log('vat at', v.join(','), 'spider', await page.evaluate(() => game.spider.pos.x.toFixed(1) + ',' + game.spider.pos.z.toFixed(1)));
+await browser.close();
