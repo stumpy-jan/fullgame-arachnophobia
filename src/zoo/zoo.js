@@ -5,7 +5,7 @@ import { Post } from '../post.js';
 import { floorMaterial, floorGeometry } from '../world/floors.js';
 import { Bodies } from '../people/bodies.js';
 import { operator, silhouette } from './figures.js';
-import { sculpted } from './sculpted.js';
+import { sculpted } from '../people/sculpted.js';
 import { damp } from '../util.js';
 
 // The zoo: one approach to drawing the people per stage, side by side, in the game's own lighting and post

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { rng, clamp, damp, angleTo } from '../util.js';
 import { TYPES } from './types.js';
 import { PathMaps } from './pathmaps.js';
-import { Bodies } from './bodies.js';
+import { sculpted } from './sculpted.js';
+import { RigRenderer } from './rigs.js';
 
 // Everyone in the lab who isn't the spider. Spawned from the layout's `people` list into its rooms.
 // Behaviour (by type, see types.js):
@@ -29,7 +30,10 @@ export class People {
       const room = world.rooms.find((r) => r.id === g.room);
       for (let i = 0; i < g.n; i++) this.spawn(g.type, room);
     }
-    this.bodies = new Bodies(scene, this.list.length + 16);
+    // drawn as sculpted figures (sculpted.js, as in the zoo), batched by part (rigs.js)
+    this.rigs = new RigRenderer(scene, this.list.length * 2 + 8);
+    this.list.forEach((h, i) => { h.seed = i + 1; h.rig = sculpted(h.type, { seed: h.seed }); h.rig.group.rotation.order = 'YXZ'; });
+    this.time = 0;
   }
 
   spawn(type, room) {
@@ -100,7 +104,7 @@ export class People {
       // --- decide
       let goal = null, speed = 0, face = null;
       if (T.fight) {
-        h.muzzle = this.bodies.muzzle(h, h.muzzle || new THREE.Vector3());
+        h.muzzle = this.muzzle(h, h.muzzle || new THREE.Vector3());
         const clear = dist < T.range && world.shotHit(h.muzzle, target) < 0;
         if (walkDist < T.panicAt) { h.state = 'flee'; }
         else if (clear) { h.state = 'aim'; }
@@ -156,10 +160,32 @@ export class People {
       if (T.fight) this.shoot(h, dt, target, dist);
     }
 
-    // draw everyone
-    this.bodies.begin();
-    for (const h of this.list) if (h.state !== 'gone') this.bodies.add(h);
-    this.bodies.end();
+    // draw everyone: pose each rig from its person's state, then batch
+    this.time = time;
+    this.rigs.begin();
+    for (const h of this.list) {
+      if (h.state === 'gone') continue;
+      const r = h.rig;
+      r.group.position.set(h.x, h.y, h.z);
+      r.group.rotation.set(h.tilt || 0, h.heading, 0);
+      r.update(time, dt, {
+        phase: h.phase, stride: h.stride, aim: h.aim, lean: h.lean,
+        panic: h.type === 'scientist' && h.state === 'flee' ? 1 : 0,
+        fireT: time - (h.lastShot ?? -9),
+        flail: h.state === 'held' ? 1 : 0,
+        fall: h.state === 'dead' ? h.fall : 0,
+        idle: h.state === 'idle' && h.seed % 2 ? 'look' : null,
+      });
+      this.rigs.add(r.group);
+    }
+    this.rigs.end();
+  }
+
+  // the rifle's muzzle (from the rig's last pose; before the first, roughly at the chest)
+  muzzle(h, out) {
+    const m = h.rig.muzzle(out);
+    if (!m || (m.x - h.x) ** 2 + (m.z - h.z) ** 2 > 4) out.set(h.x + Math.sin(h.heading) * 0.8, 1.7, h.z + Math.cos(h.heading) * 0.8);
+    return out;
   }
 
   shoot(h, dt, target, dist) {
@@ -176,7 +202,8 @@ export class People {
     // aim at the body, with spread growing with range; concrete in the way stops it
     const spread = 0.35 + dist * 0.03;
     _A.set(target.x + (this.R() - 0.5) * spread * 2, target.y + (this.R() - 0.5) * spread, target.z + (this.R() - 0.5) * spread * 2);
-    const from = this.bodies.muzzle(h, _M);
+    const from = this.muzzle(h, _M);
+    h.lastShot = this.time;
     const t = this.world.shotHit(from, _A);
     const end = t >= 0 ? _E.lerpVectors(from, _A, t) : _E.copy(_A);
     this.fx.tracer(from, end);

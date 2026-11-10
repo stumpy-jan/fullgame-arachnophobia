@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TYPES } from '../people/types.js';
 import { softDot } from '../textures.js';
-import { sculpted as sculpted2 } from './sculpted.js';
+import { sculpted as sculpted2 } from '../people/sculpted.js';
 
 // Alternative ways to draw the people, for the zoo. Each maker returns { group, update(t, dt, pose) } where
 // pose = { phase, stride (0..1), aim (0..1), lean }. All built in metres at the game's 1.25x people scale.

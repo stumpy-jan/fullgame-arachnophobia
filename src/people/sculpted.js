@@ -14,7 +14,12 @@ export const SCALE = 1.25;
 const HAIR = [0x1d1612, 0x3b2a1e, 0x5a3c22, 0x8a6a45, 0xb8a27a, 0x6e6a66, 0x111111];
 const SKIN = [0xe0b39a, 0xc68e6c, 0x9a6648, 0x6e4430, 0xf1cdb4];
 const hex = (h) => new THREE.Color().setHex(h, THREE.SRGBColorSpace);
-const lathe = (prof, seg = 14) => new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+// Geometry is shared between everyone (cached by constructor and arguments), so the game can draw each
+// part for all people in one instanced batch.
+const GEO = new Map();
+export const C = (Ctor, ...args) => { const k = Ctor.name + JSON.stringify(args); if (!GEO.has(k)) GEO.set(k, new Ctor(...args)); return GEO.get(k); };
+const cached = (k, make) => { if (!GEO.has(k)) GEO.set(k, make()); return GEO.get(k); };
+const lathe = (prof, seg = 14) => C(THREE.LatheGeometry, prof.map(([r, y]) => new THREE.Vector2(r, y)), seg);
 
 // fabric: soft wrinkles running down the cloth, and a fine weave
 let _cloth = null;
@@ -66,69 +71,69 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
   const lower = soldier ? M.suit : M.trousers, upper = soldier ? M.suit : M.shirt;
   add(lathe([[0, -0.1], [0.13, -0.09], [0.155, 0.0], [0.145, 0.1], [0, 0.11]]), lower, hips).scale.set(1.18 * bulk, 1, 0.82 * bulk);
   add(lathe([[0, 0], [0.13, 0.0], [0.135, 0.1], [0.165, 0.24], [0.19, 0.4], [0.2, 0.46], [0.16, 0.52], [0.06, 0.55], [0, 0.55]]), upper, spine).scale.set(1.22 * bulk, 1, 0.7 * bulk);
-  add(new THREE.CylinderGeometry(0.045, 0.052, 0.1, 10), soldier ? M.hood : M.skin, neck, 0, 0.0, 0);
+  add(C(THREE.CylinderGeometry, 0.045, 0.052, 0.1, 10), soldier ? M.hood : M.skin, neck, 0, 0.0, 0);
 
   // --- limbs: tapered segments with a rounded joint at each end
   const seg = (parent, len, r0, r1, mat) => add(lathe([[0, 0.01], [r0 * 0.9, 0], [r0, -0.03], [(r0 + r1) / 2 * 0.98, -len * 0.55], [r1, -len + 0.02], [r1 * 0.8, -len], [0, -len - 0.01]], 12), mat, parent);
   for (const L of legs) {
     seg(L.thigh, 0.44, 0.083 * bulk, 0.06 * bulk, lower);
     seg(L.shin, 0.43, 0.06 * bulk, 0.044 * bulk, lower);
-    const shoe = add(new RoundedBoxGeometry(0.095 * bulk, soldier ? 0.12 : 0.07, 0.25, 2, 0.03), soldier ? M.boot : M.shoe, L.foot, 0, soldier ? -0.02 : -0.01, 0.05);
+    const shoe = add(C(RoundedBoxGeometry, 0.095 * bulk, soldier ? 0.12 : 0.07, 0.25, 2, 0.03), soldier ? M.boot : M.shoe, L.foot, 0, soldier ? -0.02 : -0.01, 0.05);
     void shoe;
-    if (soldier) add(new THREE.CylinderGeometry(0.052, 0.05, 0.14, 10), M.boot, L.shin, 0, -0.37, 0); // boot shaft
+    if (soldier) add(C(THREE.CylinderGeometry, 0.052, 0.05, 0.14, 10), M.boot, L.shin, 0, -0.37, 0); // boot shaft
   }
   for (const A of arms) {
     seg(A.up, 0.29, 0.052 * bulk, 0.044 * bulk, soldier ? M.suit : M.coat);
     seg(A.fore, 0.26, 0.046 * bulk, 0.036 * bulk, soldier ? M.suit : M.coat);
-    if (!soldier) add(new THREE.CylinderGeometry(0.052, 0.046, 0.06, 10), M.coat, A.fore, 0, -0.23, 0); // cuff
+    if (!soldier) add(C(THREE.CylinderGeometry, 0.052, 0.046, 0.06, 10), M.coat, A.fore, 0, -0.23, 0); // cuff
     const hm = soldier ? M.glove : M.skin;
-    add(new RoundedBoxGeometry(0.06, 0.1, 0.03, 2, 0.013), hm, A.hand, 0, -0.045, 0.004);
-    add(new THREE.CapsuleGeometry(0.012, 0.035, 3, 6), hm, A.hand, -0.032 * A.s, -0.03, 0.015).rotation.set(0.4, 0, 0.6 * A.s);
-    if (soldier && A.s > 0) add(new THREE.CylinderGeometry(0.056, 0.056, 0.05, 10), M.band, A.up, 0, -0.06, 0); // orange shoulder band
+    add(C(RoundedBoxGeometry, 0.06, 0.1, 0.03, 2, 0.013), hm, A.hand, 0, -0.045, 0.004);
+    add(C(THREE.CapsuleGeometry, 0.012, 0.035, 3, 6), hm, A.hand, -0.032 * A.s, -0.03, 0.015).rotation.set(0.4, 0, 0.6 * A.s);
+    if (soldier && A.s > 0) add(C(THREE.CylinderGeometry, 0.056, 0.056, 0.05, 10), M.band, A.up, 0, -0.06, 0); // orange shoulder band
   }
 
   // --- head and clothes
   let coatTail = null, gun = null, flash = null, laser = null, torch = null;
   if (soldier) {
-    const hood = add(new THREE.SphereGeometry(0.13, 18, 14), M.hood, head, 0, 0.02, -0.01);
+    const hood = add(C(THREE.SphereGeometry, 0.13, 18, 14), M.hood, head, 0, 0.02, -0.01);
     hood.scale.set(0.98, 1.08, 1.04);
-    const mask = add(new THREE.SphereGeometry(0.1, 16, 12, -1.0, 2.0, 0.85, 1.0), visor, head, 0, 0.03, 0.04);
+    const mask = add(C(THREE.SphereGeometry, 0.1, 16, 12, -1.0, 2.0, 0.85, 1.0), visor, head, 0, 0.03, 0.04);
     mask.scale.set(1.2, 1.15, 1.15);
-    for (const s of [-1, 1]) { const can = add(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 12), M.tank, head, 0.07 * s, -0.06, 0.09); can.rotation.set(1.2, 0, -0.5 * s); }
-    add(new THREE.TorusGeometry(0.165, 0.022, 6, 20), M.belt, hips, 0, 0.03, 0).rotation.x = Math.PI / 2;
-    const tank = add(new THREE.CapsuleGeometry(0.085, 0.3, 4, 10), M.tank, chest, 0, 0.12, -0.17);
+    for (const s of [-1, 1]) { const can = add(C(THREE.CylinderGeometry, 0.035, 0.035, 0.05, 12), M.tank, head, 0.07 * s, -0.06, 0.09); can.rotation.set(1.2, 0, -0.5 * s); }
+    add(C(THREE.TorusGeometry, 0.165, 0.022, 6, 20), M.belt, hips, 0, 0.03, 0).rotation.x = Math.PI / 2;
+    const tank = add(C(THREE.CapsuleGeometry, 0.085, 0.3, 4, 10), M.tank, chest, 0, 0.12, -0.17);
     void tank;
-    const hose = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0.05, 0.32, -0.17), new THREE.Vector3(0.14, 0.38, -0.05), new THREE.Vector3(0.1, 0.42, 0.08), new THREE.Vector3(0.06, 0.58, 0.12)]), 12, 0.015, 6);
+    const hose = C(THREE.TubeGeometry, new THREE.CatmullRomCurve3([new THREE.Vector3(0.05, 0.32, -0.17), new THREE.Vector3(0.14, 0.38, -0.05), new THREE.Vector3(0.1, 0.42, 0.08), new THREE.Vector3(0.06, 0.58, 0.12)]), 12, 0.015, 6);
     add(hose, M.belt, chest);
     // the rifle, held by the right hand: body, stock, magazine, barrel
     gun = G(chest, 0.1, 0.2, 0.22);
-    add(new THREE.BoxGeometry(0.06, 0.1, 0.42), M.gun, gun, 0, 0, 0.05);
-    add(new THREE.BoxGeometry(0.05, 0.09, 0.22), M.gun, gun, 0, -0.02, -0.25);
-    add(new THREE.BoxGeometry(0.04, 0.14, 0.06), M.gun, gun, 0, -0.1, 0.1).rotation.x = 0.2;
-    add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 8), M.gun, gun, 0, 0.02, 0.4).rotation.x = Math.PI / 2;
-    flash = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 6, 2.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    add(C(THREE.BoxGeometry, 0.06, 0.1, 0.42), M.gun, gun, 0, 0, 0.05);
+    add(C(THREE.BoxGeometry, 0.05, 0.09, 0.22), M.gun, gun, 0, -0.02, -0.25);
+    add(C(THREE.BoxGeometry, 0.04, 0.14, 0.06), M.gun, gun, 0, -0.1, 0.1).rotation.x = 0.2;
+    add(C(THREE.CylinderGeometry, 0.012, 0.012, 0.3, 8), M.gun, gun, 0, 0.02, 0.4).rotation.x = Math.PI / 2;
+    flash = new THREE.Mesh(C(THREE.SphereGeometry, 0.09, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 6, 2.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     flash.position.set(0, 0.02, 0.6); flash.visible = false; gun.add(flash);
-    laser = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.008, 16).translate(0, 0, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.25, 0.12), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    laser = new THREE.Mesh(cached('laser', () => new THREE.BoxGeometry(0.008, 0.008, 16).translate(0, 0, 8)), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.25, 0.12), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     laser.position.set(0, 0.04, 0.55); gun.add(laser);
-    torch = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: coneTexture(), color: new THREE.Color(1.15, 1.0, 0.72), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    torch = new THREE.Mesh(cached('torch', () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ map: coneTexture(), color: new THREE.Color(1.15, 1.0, 0.72), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     torch.rotation.y = Math.PI; torch.position.set(0, 0.012, 3.4); torch.scale.set(3.2, 1, 5.6); root.add(torch);
   } else {
-    const skull = add(new THREE.SphereGeometry(0.1, 16, 12), M.skin, head, 0, 0.05, 0);
+    const skull = add(C(THREE.SphereGeometry, 0.1, 16, 12), M.skin, head, 0, 0.05, 0);
     skull.scale.set(0.9, 1.08, 1.0);
     const style = pick(['short', 'short', 'bun', 'ponytail', 'bald', 'long']);
     if (style !== 'bald') {
-      const cap = add(new THREE.SphereGeometry(0.107, 16, 10, 0, Math.PI * 2, 0, style === 'long' ? 2.0 : 1.75), M.hair, head, 0, 0.055, -0.008);
+      const cap = add(C(THREE.SphereGeometry, 0.107, 16, 10, 0, Math.PI * 2, 0, style === 'long' ? 2.0 : 1.75), M.hair, head, 0, 0.055, -0.008);
       cap.scale.set(0.93, 1.1, 1.06);
-      if (style === 'bun') add(new THREE.SphereGeometry(0.05, 10, 8), M.hair, head, 0, 0.13, -0.08);
-      if (style === 'ponytail') add(new THREE.CapsuleGeometry(0.03, 0.14, 3, 8), M.hair, head, 0, 0.0, -0.11).rotation.x = 0.35;
+      if (style === 'bun') add(C(THREE.SphereGeometry, 0.05, 10, 8), M.hair, head, 0, 0.13, -0.08);
+      if (style === 'ponytail') add(C(THREE.CapsuleGeometry, 0.03, 0.14, 3, 8), M.hair, head, 0, 0.0, -0.11).rotation.x = 0.35;
     }
     // the coat: shoulders and body on the chest, the skirt on the hips (it swings), a collar
     add(lathe([[0.0, 0.0], [0.15, 0.0], [0.17, 0.22], [0.205, 0.4], [0.21, 0.46], [0.17, 0.53], [0.06, 0.56], [0, 0.56]]), M.coat, spine).scale.set(1.26, 1, 0.76);
-    add(new THREE.TorusGeometry(0.075, 0.025, 6, 16, Math.PI * 1.4), M.coat, chest, 0, 0.26, -0.005).rotation.set(Math.PI / 2, 0, -Math.PI * 0.2 + Math.PI);
+    add(C(THREE.TorusGeometry, 0.075, 0.025, 6, 16, Math.PI * 1.4), M.coat, chest, 0, 0.26, -0.005).rotation.set(Math.PI / 2, 0, -Math.PI * 0.2 + Math.PI);
     coatTail = G(hips, 0, 0.12, 0);
-    const len = 0.5 + R() * 0.12;
+    const len = [0.5, 0.56, 0.62][Math.floor(R() * 3)]; // (three lengths: shared geometry)
     for (const s of [-1, 1]) {
-      const g = new THREE.LatheGeometry([[0.17, 0.0], [0.185, -0.15], [0.2, -0.3], [0.225, -len]].map(([r, y]) => new THREE.Vector2(r, y)), 10, s > 0 ? 0.2 : Math.PI, Math.PI * 0.8);
+      const g = C(THREE.LatheGeometry, [[0.17, 0.0], [0.185, -0.15], [0.2, -0.3], [0.225, -len]].map(([r, y]) => new THREE.Vector2(r, y)), 10, s > 0 ? 0.2 : Math.PI, Math.PI * 0.8);
       add(g, new THREE.MeshStandardMaterial({ color: dark ? 0x0b0c0e : hex(0xe2e3df), roughness: 0.9, side: THREE.DoubleSide, normalMap: clothNormal(), normalScale: new THREE.Vector2(0.22, 0.22) }), coatTail).scale.set(1.18, 1, 0.82);
     }
   }
@@ -136,6 +141,8 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
   const st = { tail: 0, tailV: 0, look: 0, lookT: R() * 3 };
   return {
     group: root,
+    // the rifle muzzle in the world (from the last update), for tracers; null if unarmed
+    muzzle(out) { return flash ? flash.getWorldPosition(out) : null; },
     update(t, dt, { phase, stride = 0, aim = 0, lean = 0, panic = 0, fireT = 9, flail = 0, fall = 0, idle = null }) {
       const s = Math.sin(phase), cph = Math.cos(phase), k = stride;
       // hips: bob at each footfall, twist with the stride; the chest counter-twists
