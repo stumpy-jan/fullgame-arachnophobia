@@ -345,3 +345,23 @@ function paintMaterial(color) {
   const alpha = canvasTexture(c, { srgb: false });
   return (_paint[color] = new THREE.MeshStandardMaterial({ color, alphaMap: alpha, transparent: true, depthWrite: false, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
 }
+
+// ------------------------------------------------------------------ specimen vats (the mutations)
+
+// A specimen vat: a glass tank of glowing fluid with something floating in it. Crash into it and it breaks
+// (world.breakables; main.js), and you pick a mutation.
+export function vat(ctx, { x, z }) {
+  const { M } = ctx;
+  const g = new THREE.Group(); g.position.set(x, 0, z); ctx.root.add(g);
+  const add = (geo, mat, y, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = cast; m.receiveShadow = true; g.add(m); return m; };
+  add(cylGeo(0.92, 1.0, 0.35, 32), M.darkSteel, 0.175);
+  const glass = add(cylGeo(0.75, 0.75, 1.8, 32, 1, true), M.glass, 0.35 + 0.9, false);
+  const fluid = add(cylGeo(0.7, 0.7, 1.45, 32), new THREE.MeshStandardMaterial({ color: 0x4a1236, emissive: 0xff3aa8, emissiveIntensity: 0.55, roughness: 0.2, transparent: true, opacity: 0.8 }), 0.35 + 0.73, false);
+  const organ = add(new THREE.SphereGeometry(1, 24, 18), new THREE.MeshStandardMaterial({ color: 0xb05a6a, emissive: 0x501020, emissiveIntensity: 0.5, roughness: 0.45 }), 1.25, false);
+  organ.scale.set(0.3, 0.42, 0.26);
+  const cap = add(cylGeo(0.85, 0.85, 0.22, 32), M.darkSteel, 2.26);
+  const light = new THREE.PointLight(0xff3aa8, 12, 7, 2); light.position.y = 1.3; g.add(light);
+  ctx.contact(x, z, 2, 2, true);
+  ctx.solidDisc(x, z, 0.95, 0.35);
+  ctx.breakables.push({ kind: 'vat', x, z, r: 1.0, parts: [glass, fluid, organ, cap], organ, light, broken: false });
+}

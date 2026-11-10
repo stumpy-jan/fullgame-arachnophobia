@@ -23,7 +23,7 @@ export function buildWorld(scene, layout) {
 
   // ---------------------------------------------------------------- the build context the kit uses
   const ctx = {
-    root, M, R: rng(layout.seed), screens: [], lamps: [], beacons: [],
+    root, M, R: rng(layout.seed), screens: [], lamps: [], beacons: [], breakables: [],
     mesh(geo, mat, x, y, z, { cast = true, receive = true } = {}) {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x, y, z);
@@ -154,7 +154,7 @@ export function buildWorld(scene, layout) {
   }
 
   return {
-    root, layout, bounds: B, rooms: layout.rooms, heightAt, collide, shotHit, nav, roomAt, update,
+    root, layout, bounds: B, rooms: layout.rooms, breakables: ctx.breakables, heightAt, collide, shotHit, nav, roomAt, update,
     route: layout.route.map(([x, z]) => new THREE.Vector2(x, z)),
     spawn: layout.spawn,
   };

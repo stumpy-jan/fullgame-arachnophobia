@@ -57,6 +57,9 @@ export function makeLabLayout(seed = 1337) {
   add('paint', { x0: 11.5, z0: -12.7, x1: 30.5, z1: -12.7 }); add('paint', { x0: 11.5, z0: -10.2, x1: 30.5, z1: -10.2 });
   add('paint', { x0: 11.5, z0: 8.2, x1: 30.5, z1: 8.2, w: 0.1, color: 0xd8d8d0 }); add('paint', { x0: 11.5, z0: 20.6, x1: 30.5, z1: 20.6, w: 0.1, color: 0xd8d8d0 });
 
+  // specimen vats: smash one, pick a mutation
+  for (const [x, z] of [[-28, -8], [-13.2, 9], [29.5, 13], [24, -8]]) add('vat', { x, z });
+
   // lights: a few cast shadows (they cost a render each); the one over the broken tank flickers
   for (const [x, z, shadow, flicker] of [[-24, -13, 1], [-15, -6], [-24, 9, 1], [-15, 16], [0, -2, 1, 1], [0, 11, 1], [-5, -14], [6, -14], [18, -11, 1], [26, -3], [16, 12, 1], [26, 17]]) {
     add('lamp', { x, z, shadow: !!shadow, flicker: !!flicker });

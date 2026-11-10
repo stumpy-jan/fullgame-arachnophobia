@@ -122,6 +122,16 @@ export class Spider {
     // spinnerets
     add(this.abPivot, new THREE.ConeGeometry(0.1, 0.26, 10), chitin, 0, 0.05, -2.2).rotation.x = -Math.PI / 2 - 0.4;
 
+    // body slots (Design/DESIGN.md): mutations hang their parts on these mounts (or on the legs, by pair)
+    this.mat = { chitin, leg: legMat, abdomen: this.abMat };
+    this.mounts = { maw: new THREE.Group(), carapace: new THREE.Group(), abdomen: new THREE.Group(), glands: new THREE.Group() };
+    this.root.add(this.mounts.maw, this.mounts.carapace);
+    this.mounts.carapace.position.set(0, 0.3, 0.3);
+    this.abPivot.add(this.mounts.abdomen, this.mounts.glands);
+    this.mounts.abdomen.position.set(0, 0.18, -1.15);
+    this.mounts.glands.position.set(0, 0.05, -2.2);
+    this.mawJaws = [];
+
     // legs: lathed segments (radius along the length: a thick base, a waist, a swelling before the next
     // joint) with bristles baked in; built at their real length, seg() only scales when IK stretches them
     const femurGeo = spiny(lathe(FEMUR, [[0, 0.15], [0.06, 0.18], [0.25, 0.17], [0.55, 0.14], [0.8, 0.125], [0.93, 0.145], [1, 0.1]]), FEMUR, 0.15, 28, R);
@@ -329,18 +339,30 @@ export class Spider {
     this.time += dt;
     this.events.length = 0;
 
-    // --- move
+    // --- move (or fly, mid-pounce)
     const max = input.sprint ? P.sprint : P.walk;
     const prevVel = _w.copy(this.vel);
-    this.vel.x = damp(this.vel.x, input.x * max, P.accel, dt);
-    this.vel.z = damp(this.vel.z, input.z * max, P.accel, dt);
-    const speed = Math.hypot(this.vel.x, this.vel.z);
+    const L = this.leap;
+    if (L) {
+      L.t = Math.min(1, L.t + dt / L.dur);
+      const e = smooth(L.t);
+      const nx = L.from.x + (L.to.x - L.from.x) * e, nz = L.from.z + (L.to.z - L.from.z) * e;
+      this.vel.set((nx - this.pos.x) / Math.max(dt, 1e-4), 0, (nz - this.pos.z) / Math.max(dt, 1e-4));
+      this.pos.x = nx; this.pos.z = nz;
+    } else {
+      this.vel.x = damp(this.vel.x, input.x * max, P.accel, dt);
+      this.vel.z = damp(this.vel.z, input.z * max, P.accel, dt);
+      this.pos.x += this.vel.x * dt;
+      this.pos.z += this.vel.z * dt;
+    }
+    const speed = L ? 0 : Math.hypot(this.vel.x, this.vel.z);
+    this.speed = speed;
     if (speed > 0.4) {
       const want = Math.atan2(this.vel.x, this.vel.z);
       this.heading += clamp(angleTo(this.heading, want), -P.turn * dt, P.turn * dt);
+    } else if (input.face !== undefined && !L) {
+      this.heading += clamp(angleTo(this.heading, input.face), -P.turn * 0.8 * dt, P.turn * 0.8 * dt);
     }
-    this.pos.x += this.vel.x * dt;
-    this.pos.z += this.vel.z * dt;
     // only the lab's outer walls hold it in (on the thorax and the abdomen behind it); it climbs over the rest
     for (let it = 0; it < 2; it++) {
       for (const [off, r] of [[0.3, 1.1], [-1.6, 0.9]]) {
@@ -372,6 +394,15 @@ export class Spider {
     }
     const wantY = Math.max(hard, Math.min(this.avgFootY() + P.ride, hi));
     this.pos.y = damp(this.pos.y, wantY, wantY > this.pos.y ? 9 : 5, dt);
+    if (L) {
+      // the arc of the leap; legs tucked in under the body; landing hits everyone there
+      this.pos.y = L.y0 + (Math.max(wantY, L.y0) - L.y0) * L.t + Math.sin(Math.PI * L.t) * 3.2;
+      if (L.t >= 1) {
+        this.leap = null;
+        this.events.push({ type: 'land', pos: this.pos.clone() });
+        for (const l of this.legs) if (!l.strike) { l.hover = true; l.lastPlan = -1; l.hoverGoal.copy(l.foot); }
+      }
+    }
 
     // bob: a damped spring kicked by each footfall, plus a slow breath
     this.bobV += (-this.bob * 60 - this.bobV * 9) * dt;
@@ -433,6 +464,15 @@ export class Spider {
     }
     // in the air or not: how the metatarsus is carried
     for (const l of this.legs) l.air = damp(l.air, l.hover && !l.stepping ? 1 : l.stepping ? 0.35 : 0, 8, dt);
+
+    if (this.leap) {
+      for (const l of this.legs) {
+        if (l.strike) continue;
+        l.stepping = false; l.hover = true; l.lastPlan = this.time;
+        _R.set(l.rest.x * 0.45, -1.1, l.rest.z * 0.45 + (l.k < 2 ? 0.5 : -0.2));
+        this.root.localToWorld(_R); l.hoverGoal.copy(_R);
+      }
+    }
 
     // --- legs: who needs to step
     const fast = clamp(speed / P.sprint, 0, 1);
@@ -535,13 +575,55 @@ export class Spider {
   // Strike with every free leg that has someone in reach: the front pair on the move, the front two pairs
   // standing still (more legs to spare when it doesn't need them to walk). people: People (nearest,
   // grab, consume). Returns how many legs struck.
-  strike(people) {
+  // The autoattack: every free front leg brings its claw down on someone in the front arc (120 degrees).
+  // Legs that walk can't slash: standing still, the front four; walking, the front pair; sprinting, none.
+  autoSlash(people, opts = {}) {
+    this.people = people;
+    if (this.leap || this.feeding) return 0;
+    const sp = this.speed || 0;
+    const pairs = sp < 1.2 ? [0, 1] : sp < spiderParams.walk + 1 ? [0] : [];
+    if (!pairs.length) return 0;
+    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    const taken = new Set(this.legs.filter((l) => l.strike).map((l) => l.strike.h));
+    let n = 0;
+    for (const l of this.legs) {
+      if (!pairs.includes(l.k) || l.strike || this.time - (l.strikeEnd || -9) < (opts.rest ?? 0.45)) continue;
+      const hip = this.hipWorld(l, _H);
+      const h = people.nearest(hip.x, hip.z, STRIKE_REACH, (o) => {
+        if (taken.has(o)) return false;
+        const dx = o.x - this.pos.x, dz = o.z - this.pos.z, d = Math.hypot(dx, dz) || 1;
+        return (dx * fx + dz * fz) / d > 0.5 && (dx * Math.cos(this.heading) - dz * Math.sin(this.heading)) * l.s > -1.0;
+      });
+      if (!h) continue;
+      taken.add(h);
+      l.strike = { h, t: 0, phase: 'raise', from: new THREE.Vector3(), kind: 'slash', dmg: opts.dmg ?? 2 };
+      l.stepping = false; l.hover = true;
+      n++;
+    }
+    return n;
+  }
+
+  // Pounce: leap at (x, z), at most 11 m away; landing (event 'land') hits and stuns everyone there.
+  pounce(x, z) {
+    if (this.leap) return false;
+    let dx = x - this.pos.x, dz = z - this.pos.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 1) return false;
+    const k = Math.min(1, 11 / d); dx *= k; dz *= k;
+    this.leap = { from: this.pos.clone(), to: new THREE.Vector3(this.pos.x + dx, 0, this.pos.z + dz), t: 0, dur: 0.38 + Math.hypot(dx, dz) * 0.025, y0: this.pos.y };
+    this.heading = Math.atan2(dx, dz);
+    return true;
+  }
+
+  // Devour (and the old impale): a leg seizes someone and carries them to the jaws to be eaten.
+  strike(people, opts = {}) {
     this.people = people;
     const speed = Math.hypot(this.vel.x, this.vel.z);
     const pairs = speed < 1 ? [0, 1] : [0];
     const taken = new Set(this.legs.filter((l) => l.strike).map((l) => l.strike.h));
     let n = 0;
     for (const l of this.legs) {
+      if (opts.max && n >= opts.max) break;
       if (!pairs.includes(l.k) || l.strike || this.time - (l.strikeEnd || -9) < 0.15) continue;
       const hip = this.hipWorld(l, _H);
       const side = l.s * Math.cos(this.heading), sideZ = -l.s * Math.sin(this.heading); // this leg's side of the body
@@ -565,12 +647,18 @@ export class Spider {
       const hip = this.hipWorld(l, _H);
       _R.set(h.x + (hip.x - h.x) * 0.15, Math.max(h.y + 3.4, hip.y + 1.4), h.z + (hip.z - h.z) * 0.15);
       l.foot.x = damp(l.foot.x, _R.x, 16, dt); l.foot.y = damp(l.foot.y, _R.y, 16, dt); l.foot.z = damp(l.foot.z, _R.z, 16, dt);
-      if (S.t > 0.22) { S.phase = 'stab'; S.t = 0; S.from.copy(l.foot); }
+      if (S.t > (S.kind === 'slash' ? 0.15 : 0.22)) { S.phase = 'stab'; S.t = 0; S.from.copy(l.foot); }
     } else if (S.phase === 'stab') {
       // down through them
       _R.set(h.x, h.y + 1.35, h.z);
       const e = Math.min(1, S.t / 0.07);
       l.foot.lerpVectors(S.from, _R, e * e);
+      if (e >= 1 && S.kind === 'slash') {
+        P.hit(h, S.dmg, _D.set(h.x - this.pos.x, 0, h.z - this.pos.z));
+        this.events.push({ type: 'slash', h, pos: l.foot.clone() });
+        this.endStrike(l);
+        return;
+      }
       if (e >= 1) {
         P.grab(h);
         this.events.push({ type: 'impale', h, pos: l.foot.clone() });
@@ -636,7 +724,7 @@ export class Spider {
   }
 }
 
-const _R = new THREE.Vector3(), _H = new THREE.Vector3(), _H2 = new THREE.Vector3(), _S = new THREE.Vector3(), _F = new THREE.Vector3(), _K = new THREE.Vector3(), _A = new THREE.Vector3();
+const _D = new THREE.Vector3(), _R = new THREE.Vector3(), _H = new THREE.Vector3(), _H2 = new THREE.Vector3(), _S = new THREE.Vector3(), _F = new THREE.Vector3(), _K = new THREE.Vector3(), _A = new THREE.Vector3();
 const EDGE = [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]];
 const FOOTPRINT = [[0, 0], [0.65, 0], [-0.65, 0], [0, 1.1], [0, -0.8], [0, -1.6], [0, -2.3]];
 const smooth = (t) => t * t * (3 - 2 * t);

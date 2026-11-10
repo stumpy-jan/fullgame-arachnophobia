@@ -46,6 +46,7 @@ export class People {
     const h = {
       type, T: TYPES[type], x, y: 0, z, heading: R() * 6.28, vx: 0, vz: 0,
       phase: R() * 6, stride: 0, lean: 0, aim: 0, fall: 0, tilt: 0, flail: false,
+      hp: type === 'soldier' ? 3 : 1, stunT: 0,
       state: 'idle', wanderT: 0, wx: x, wz: z, burst: 0, shotT: 0, cool: R() * 1.5,
     };
     this.list.push(h);
@@ -62,6 +63,23 @@ export class People {
       const d = (h.x - x) ** 2 + (h.z - z) ** 2;
       if (d < bd) { bd = d; best = h; }
     }
+    return best;
+  }
+
+  // damage (the slash, quills, a pounce): blood, a stagger; dead at 0 hp
+  hit(h, dmg, dir) {
+    if (!this.alive(h)) return;
+    h.hp -= dmg;
+    const p = new THREE.Vector3(h.x, 1.3, h.z), d = dir ? dir.clone().setY(0).normalize() : null;
+    this.fx.burst(p, 'blood', 12, d);
+    if (h.hp <= 0) { this.kill(h); if (d) { h.x += d.x * 0.6; h.z += d.z * 0.6; h.heading = Math.atan2(d.x, d.z); } }
+    else { h.stunT = Math.max(h.stunT, 0.35); this.alarm = 0; }
+  }
+  stun(h, t) { if (this.alive(h)) h.stunT = Math.max(h.stunT, t); }
+  // the nearest corpse within r (for feeding)
+  corpse(x, z, r) {
+    let best = null, bd = r * r;
+    for (const h of this.list) if (h.state === 'dead') { const d = (h.x - x) ** 2 + (h.z - z) ** 2; if (d < bd) { bd = d; best = h; } }
     return best;
   }
 
@@ -97,6 +115,7 @@ export class People {
       if (h.state === 'gone') continue;
       if (h.state === 'dead') { h.fall = Math.min(1, h.fall + dt / 0.45); h.stride = damp(h.stride, 0, 8, dt); continue; }
       if (h.state === 'held') { h.phase += dt * 9; continue; } // the spider moves it
+      if (h.stunT > 0) { h.stunT -= dt; h.aim = damp(h.aim, 0, 10, dt); h.stride = damp(h.stride, 0, 10, dt); h.burst = 0; continue; } // reeling
       const T = h.T, j = nav.index(h.x, h.z);
       const walkDist = j >= 0 ? maps.toSpider[j] * nav.cell : 1e9;
       const dx = spider.pos.x - h.x, dz = spider.pos.z - h.z, dist = Math.hypot(dx, dz);
