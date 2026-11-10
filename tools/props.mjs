@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
-const BUDGET = { centrifuge: 4000, hazmat_locker: 5000, lab_trolley: 3000, generator: 15000, hazmat_hood: 2000, rifle: 1500, air_tank: 1500, spider_thorax: 4000, spider_abdomen: 4000, maw_mandible: 1000, abdomen_quills: 3000, foreleg_scythe: 800 };
+const BUDGET = { centrifuge: 4000, hazmat_locker: 5000, lab_trolley: 3000, generator: 15000, hazmat_hood: 2000, rifle: 1500, air_tank: 1500, spider_thorax: 4000, spider_abdomen: 4000, maw_mandible: 1000, abdomen_quills: 3000, foreleg_scythe: 800, tank_lid: 8000, tank_base: 4000, specimen: 3000 }; // (the tanks: few of them, and their bolts shatter below these)
 const TEX = { generator: 2048 };
 const ROOT = 'assets/pilot', OUT = 'public/models/props';
 

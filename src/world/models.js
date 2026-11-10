@@ -11,6 +11,7 @@ export const FIT = {
   hazmat_hood: ['y', 0.34], rifle: ['max', 0.9], air_tank: ['y', 0.55],
   spider_thorax: ['max', 1.7], spider_abdomen: ['max', 2.1],
   maw_mandible: ['max', 0.7], abdomen_quills: ['max', 1.9], foreleg_scythe: ['max', 1.1], // mutation parts (on the spider: spider.mutationPart)
+  tank_lid: ['x', 2], specimen: ['max', 1], // tanks and vats (kit.js scales them to each)
 };
 
 let loader = null;

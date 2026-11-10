@@ -1,0 +1,66 @@
+{
+  "title": "Vat specimen",
+  "concept": "The creature floating in a specimen vat (breaks free when the spider smashes the vat).",
+  "sheet": "Studio product photograph of a single preserved pale pink larva specimen on its own: a soft swollen segmented grub-like body curled into a C, translucent skin with dark veins, many thin jointed legs folded tightly against its underside, no face, no human features, wet glistening surface, front three-quarter view, not in a jar. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    61,
+    77
+  ],
+  "notes": "Budget: 1,500 triangles, 512 maps. Inside the vat's glass (the breakable organ).",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_77_0.glb",
+    "fit": [
+      "y",
+      1.0
+    ],
+    "faces": 8000,
+    "budget": 1500,
+    "texture": 512,
+    "looks": {
+      "body": {
+        "color": [
+          0.5,
+          0.25,
+          0.25
+        ],
+        "shade": [
+          0.3,
+          0.12,
+          0.13
+        ],
+        "roughness": 0.4,
+        "pattern": "pores",
+        "scale": 50,
+        "bump": 0.08,
+        "texture_color": 1,
+        "subsurface": 0.3,
+        "cavity": {
+          "color": [
+            0.15,
+            0.03,
+            0.05
+          ],
+          "amount": 0.5
+        },
+        "metallic": 0
+      }
+    },
+    "thicken_m": 0.004,
+    "shrinkwrap_reach": 0.002
+  },
+  "sheet_v1": "Studio product photograph of a single preserved pale pink fleshy creature specimen on its own, curled up like an unborn thing: soft translucent skin with dark veins, a swollen rounded body, several thin jointed legs folded tightly against it, eyes closed, wet glistening surface, front three-quarter view, not in a jar. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "picks": {
+    "sheet": "img_77_0.png"
+  }
+}

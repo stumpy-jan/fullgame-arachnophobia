@@ -1,0 +1,77 @@
+{
+  "title": "Tank lid",
+  "concept": "The top of a containment tank or specimen vat: what the top-down camera sees.",
+  "sheet": "Top-down photograph looking straight down at a single round heavy industrial lid for a cylindrical laboratory containment tank, on its own: a thick dark steel disc with a ring of big hex bolts round its rim, a raised round central hatch with a red valve wheel on it, two thick black rubber hoses and a bundle of cables coming off the top and bending over the edge, a thin band of yellow and black hazard stripes round the rim, worn grimy steel with scuffs and rust stains. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    61
+  ],
+  "notes": "Budget: 2,500 triangles, 1K maps. Sits on the glass: the vat (r 0.85) and the containment tank (r 1.63) scale it.",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_61_2_cut.glb",
+    "fit": [
+      "x",
+      1.0
+    ],
+    "faces": 8000,
+    "budget": 2500,
+    "texture": 1024,
+    "looks": {
+      "body": {
+        "color": [
+          0.2,
+          0.2,
+          0.21
+        ],
+        "shade": [
+          0.1,
+          0.1,
+          0.11
+        ],
+        "roughness": 0.55,
+        "pattern": "metal",
+        "scale": 40,
+        "bump": 0.12,
+        "texture_color": 0.9,
+        "cavity": {
+          "color": [
+            0.02,
+            0.02,
+            0.02
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.55,
+            0.55,
+            0.55
+          ],
+          "amount": 0.25,
+          "roughness": 0.35
+        },
+        "metallic": 0.6
+      }
+    },
+    "thicken_m": 0.004,
+    "shrinkwrap_reach": 0.002,
+    "tilt": [
+      -90,
+      0
+    ]
+  },
+  "picks": {
+    "sheet": "img_61_2.png",
+    "cut": "tools/cut.py 0.42 (the mesher made it a whole drum)"
+  }
+}
