@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWorld } from './world/world.js';
 import { makeLabLayout } from './world/layout.js';
 import { makeGymLayout } from './world/gym.js';
+import { makeFacility } from './world/generate.js';
 import { loadModels } from './world/models.js';
 import { Spider } from './spider.js';
 import { Post, postParams } from './post.js';
@@ -47,7 +48,10 @@ await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_tro
 // ?gym: an obstacle course with nobody in it, for moving the spider around (world/gym.js)
 const GYM = Q.has('gym');
 if (GYM) audioOpts.siren = false;
-const lab = buildWorld(scene, GYM ? makeGymLayout() : makeLabLayout());
+// the level: a generated facility (?seed=N; a fresh one every run), or ?lab for the hand-made first lab
+const SEED = Q.get('seed') ? +Q.get('seed') : Q.has('shot') ? 1 : Math.floor(Math.random() * 1e6);
+const lab = buildWorld(scene, GYM ? makeGymLayout() : Q.has('lab') ? makeLabLayout() : makeFacility(SEED));
+console.log('facility seed', SEED, lab.layout.info || '');
 const spider = new Spider(scene, lab);
 spider.place(lab.spawn.x, lab.spawn.z, lab.spawn.heading);
 if (Q.get('at')) { const [x, z, h] = Q.get('at').split(',').map(Number); spider.place(x, z, h || 0); }
@@ -278,7 +282,7 @@ function frame(now) {
     const id = mutations.have[slot];
     return { slot: SLOT_NAMES[slot], name: id ? MUTATIONS[id].name : null, key: SLOT_KEYS[slot], cd: mutations.cd[slot] || 0, max: id ? MUTATIONS[id].cooldown || 0 : 0 };
   }));
-  lab.update(time);
+  lab.update(time, spider.pos);
   dust.update(dt, time);
   updateCamera(real, time);
   post.render(scene, camera, time);
@@ -288,4 +292,4 @@ updateCamera(1, 0);
 requestAnimationFrame(frame);
 
 // for tools and the console
-window.game = { spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };
+window.game = { seed: SEED, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };

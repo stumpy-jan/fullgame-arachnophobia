@@ -23,7 +23,7 @@ export function buildWorld(scene, layout) {
 
   // ---------------------------------------------------------------- the build context the kit uses
   const ctx = {
-    root, M, R: rng(layout.seed), screens: [], lamps: [], beacons: [], breakables: [], locks: [], door: null, solids,
+    root, M, R: rng(layout.seed), screens: [], lamps: [], glows: [], beacons: [], breakables: [], locks: [], door: null, solids,
     mesh(geo, mat, x, y, z, { cast = true, receive = true } = {}) {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x, y, z);
@@ -77,6 +77,34 @@ export function buildWorld(scene, layout) {
     build(ctx, p);
   }
   scene.add(new THREE.HemisphereLight(0x7a93a8, 0x0d0d0f, 0.22));
+
+  // ---------------------------------------------------------------- pooled lights
+  // A forward renderer pays for every light on every pixel, so a level has a fixed set of real lights that go to
+  // the lamps (and vat glows) nearest the camera's focus: 12 spots, the first 5 casting shadows, and 3 points.
+  const SPOTS = Math.min(12, ctx.lamps.length), SHADOWS = Math.min(5, SPOTS), GLOWS = Math.min(3, ctx.glows.length);
+  const spots = [], points = [];
+  for (let i = 0; i < SPOTS; i++) {
+    const l = new THREE.SpotLight(0xffe8cc, 0, 0, 0.72, 0.65, 2);
+    if (i < SHADOWS) {
+      l.castShadow = true; l.shadow.mapSize.set(1024, 1024);
+      l.shadow.camera.near = 1; l.shadow.camera.far = 18; l.shadow.bias = -0.0004; l.shadow.normalBias = 0.03;
+    }
+    root.add(l, l.target); spots.push(l);
+  }
+  for (let i = 0; i < GLOWS; i++) { const l = new THREE.PointLight(0xff3aa8, 0, 7, 2); root.add(l); points.push(l); }
+  const near = (list, n, fx, fz) => list.map((o) => [(o.x - fx) ** 2 + (o.z - fz) ** 2, o]).sort((p, q) => p[0] - q[0]).slice(0, n).map((p) => p[1]);
+  function assignLights(t, fx, fz) {
+    // shadow casters first (the lamps marked for it), then the rest, nearest first
+    const chosen = near(ctx.lamps, SPOTS, fx, fz).sort((p, q) => (q.shadow - p.shadow));
+    chosen.forEach((L, i) => {
+      const l = spots[i];
+      l.position.set(L.x, 9.9, L.z); l.target.position.set(L.x, 0, L.z);
+      const f = L.flicker && (Math.sin(t * 13.1 + L.i) * Math.sin(t * 7.7 + 1) > 0.55 || Math.sin(t * 0.9 + L.i) > 0.92) ? 0.08 : 1;
+      l.intensity = L.base * f;
+    });
+    near(ctx.glows, GLOWS, fx, fz).forEach((G, i) => { points[i].position.set(G.x, G.y, G.z); points[i].intensity = G.ref.intensity; });
+  }
+  assignLights(0, layout.spawn.x, layout.spawn.z);
 
   // ---------------------------------------------------------------- height field
   // every solid rasterised at 10 cm; a cell holds the highest top over its centre; outside: floor
@@ -147,12 +175,8 @@ export function buildWorld(scene, layout) {
   }
   function roomAt(x, z) { return layout.rooms.find((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) || null; }
 
-  function update(t) {
-    for (const L of ctx.lamps) {
-      if (!L.flicker) continue;
-      const f = Math.sin(t * 13.1) * Math.sin(t * 7.7 + 1) > 0.55 || Math.sin(t * 0.9) > 0.92 ? 0.08 : 1;
-      L.l.intensity = L.base * f;
-    }
+  function update(t, focus) {
+    if (focus) assignLights(t, focus.x, focus.z);
     for (const b of ctx.beacons) {
       const a = t * 2.4 + b.phase;
       b.l.target.position.set(b.x + Math.cos(a) * 7, 0, b.z + Math.sin(a) * 7);

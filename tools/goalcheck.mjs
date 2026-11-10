@@ -4,7 +4,7 @@ const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 page.on('pageerror', (e) => console.log('[err]', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.log('[console]', m.text()); });
-await page.goto('http://localhost:5391/?shot&god');
+await page.goto('http://localhost:5391/?shot&god&seed=1');
 await page.waitForFunction(() => window.game && window.game.time > 0.5);
 const locks = await page.evaluate(() => game.lab.locks.map((L) => ({ x: L.x, z: L.z, w: L.w, d: L.d, kind: L.kind })));
 console.log('locks', JSON.stringify(locks));

@@ -10,7 +10,7 @@ npm run dev        # http://localhost:5391
 
 Controls: WASD / arrows move (screen-relative), Shift scuttles, Space or click impales (front legs on the move, front four standing still), P toggles the autopilot tour, 1 toggles the post pass, R restarts after death.
 
-URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` no damage, `?nopeople` empty lab, `?gym` an obstacle course with nobody in it (steps 0.4-3.2 m, walls, a tank, clutter; `world/gym.js`), `?spider=procedural|abdomen|carapace|both` which spider (the gym has buttons for these, V cycles; `?classic` = procedural), `?eye=x,y,z&look=x,y,z&hide` debug camera, `?cam=height,back` camera distance, `?at=x,z,heading` start position, `?nopost`.
+URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` no damage, `?nopeople` empty lab, `?seed=N` replay a facility, `?lab` the hand-made lab, `?gym` an obstacle course with nobody in it (steps 0.4-3.2 m, walls, a tank, clutter; `world/gym.js`), `?spider=procedural|abdomen|carapace|both` which spider (the gym has buttons for these, V cycles; `?classic` = procedural), `?eye=x,y,z&look=x,y,z&hide` debug camera, `?cam=height,back` camera distance, `?at=x,z,heading` start position, `?nopost`.
 
 ## How it works
 
@@ -30,6 +30,9 @@ URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` 
     beacon, tape, stencil ...). Builders make meshes and register what they occupy: flat-topped solids (what
     the spider stands on), bullet blockers, contact shadows. Dividing walls are an extruded concrete
     cross-section with closed ends; columns go at every wall end automatically.
+  - `generate.js`: `makeFacility(seed)`, a generated facility in the same layout format (BSP rooms, doors on a
+    spanning tree, depth from the start sets how full and guarded each room is). The default; `?lab` plays the
+    hand-made lab instead. `node tools/plan.mjs <seed ...>` draws plans to shots/plan_<seed>.svg.
   - `world.js`: `buildWorld(scene, layout)` builds any layout and serves the queries: `heightAt` (a 10 cm
     height grid), `shotHit` (line of fire vs walls, columns and tall props, height-aware), `collide` (outer
     shell), `nav` (a 0.5 m walk grid for people), `roomAt`.

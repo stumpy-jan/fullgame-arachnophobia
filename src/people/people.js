@@ -184,6 +184,7 @@ export class People {
     this.rigs.begin();
     for (const h of this.list) {
       if (h.state === 'gone') continue;
+      if (Math.abs(h.x - spider.pos.x) > 46 || Math.abs(h.z - spider.pos.z) > 34) continue; // off screen: not posed or drawn
       const r = h.rig;
       r.group.position.set(h.x, h.y, h.z);
       r.group.rotation.set(h.tilt || 0, h.heading, 0);

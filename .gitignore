@@ -15,3 +15,5 @@ assets/pilot/*/*_normal.png
 assets/pilot/*/*_roughness.png
 assets/pilot/*/*.glb
 tools/_gym.mjs
+tools/_svg2png.mjs
+tools/_fps.mjs

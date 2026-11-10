@@ -2,7 +2,9 @@
 //   toSpider  walking distance (in cells) from every open cell to the spider, round walls and props
 //   flee      a map to run down: -1.3 x toSpider, then relaxed again, so its slopes lead round the walls
 //             and out through doors to safety rather than into the nearest corner
-// People walk downhill on them (descend). Rebuilt a few times a second as the spider moves.
+// People walk downhill on them (descend). Rebuilt a few times a second as the spider moves, out to RANGE cells of
+// walking (beyond that nobody reacts to the spider anyway, and a big level would cost a whole-map Dijkstra each time).
+const RANGE = 130; // cells: 65 m
 const SQ2 = Math.SQRT2;
 
 export class PathMaps {
@@ -33,13 +35,14 @@ export class PathMaps {
     const src = this.nearestOpen(sx, sz);
     if (src < 0) return;
     toSpider[src] = 0;
-    this.relax(toSpider);
+    this.relax(toSpider, RANGE);
     for (let i = 0; i < flee.length; i++) flee[i] = nav.pass[i] && toSpider[i] < Infinity ? -1.3 * toSpider[i] : Infinity;
-    this.relax(flee);
+    this.relax(flee, Infinity, toSpider);
   }
 
   // Dijkstra from every finite cell (8 neighbours; diagonals only where both sides are open)
-  relax(d) {
+  // (max: stop there; mask: only cells finite on it)
+  relax(d, max = Infinity, mask = null) {
     const { nav, heap } = this, { nx, nz, pass } = nav;
     heap.clear();
     for (let i = 0; i < d.length; i++) if (d[i] < Infinity) heap.push(i, d[i]);
@@ -52,10 +55,10 @@ export class PathMaps {
         const X = x + dx, Z = z + dz;
         if (X < 0 || Z < 0 || X >= nx || Z >= nz) continue;
         const j = Z * nx + X;
-        if (!pass[j]) continue;
+        if (!pass[j] || (mask && mask[j] === Infinity)) continue;
         if (dx && dz && (!pass[z * nx + X] || !pass[Z * nx + x])) continue;
         const nc = c + (dx && dz ? SQ2 : 1);
-        if (nc < d[j]) { d[j] = nc; heap.push(j, nc); }
+        if (nc < d[j] && nc <= max) { d[j] = nc; heap.push(j, nc); }
       }
     }
   }

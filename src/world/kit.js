@@ -268,18 +268,10 @@ export function cable(ctx, { pts }) {
 
 // A ceiling lamp: a pool of light from 10 m up (no visible fixture: from up here it'd be a dark disc
 // between the camera and the floor). shadow: casts shadows (keep these few); flicker: stutters.
+// a ceiling lamp: just where it is (world.js pools the actual lights: the nearest dozen get real SpotLights,
+// so a big level costs no more to light than a small one)
 export function lamp(ctx, { x, z, shadow = false, flicker = false }) {
-  const l = new THREE.SpotLight(0xffe8cc, 700, 0, 0.72, 0.65, 2);
-  l.target.position.set(x, 0, z);
-  ctx.light(l, x, 9.9, z);
-  ctx.root.add(l.target);
-  if (shadow) {
-    l.castShadow = true;
-    l.shadow.mapSize.set(1024, 1024);
-    l.shadow.camera.near = 1; l.shadow.camera.far = 18;
-    l.shadow.bias = -0.0004; l.shadow.normalBias = 0.03;
-  }
-  ctx.lamps.push({ l, base: l.intensity, flicker });
+  ctx.lamps.push({ x, z, shadow, flicker, base: 700, i: ctx.lamps.length });
 }
 
 // A red alarm beacon on top of a column, its beam sweeping round.
@@ -361,7 +353,8 @@ export function vat(ctx, { x, z }) {
   const organ = add(new THREE.SphereGeometry(1, 24, 18), new THREE.MeshStandardMaterial({ color: 0xb05a6a, emissive: 0x501020, emissiveIntensity: 0.5, roughness: 0.45 }), 1.25, false);
   organ.scale.set(0.3, 0.42, 0.26);
   const cap = add(cylGeo(0.85, 0.85, 0.22, 32), M.darkSteel, 2.26);
-  const light = new THREE.PointLight(0xff3aa8, 12, 7, 2); light.position.y = 1.3; g.add(light);
+  const light = { intensity: 12 }; // (its glow: a pooled PointLight, world.js)
+  ctx.glows.push({ x, y: 1.3, z, ref: light });
   ctx.contact(x, z, 2, 2, true);
   ctx.solidDisc(x, z, 0.95, 0.35);
   ctx.breakables.push({ kind: 'vat', x, z, r: 1.0, parts: [glass, fluid, organ, cap], organ, light, broken: false });

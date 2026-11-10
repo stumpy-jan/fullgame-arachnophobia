@@ -13,6 +13,11 @@ light. Decisions so far, with the open questions at the end.
   chosen kinds, in any order), which unseals the security door; break through it.
 - **Generation:** rooms in a graph of typed rooms behind concrete dividing walls; the exit as far from the start
   as walking goes; lock machines in separate, well-defended rooms; vats spread, more of them off the main path.
+  **Built** (`src/world/generate.js`, a new seed every run, `?seed=N` to replay): a 132 x 96 m site (about 4.5x
+  the first lab) split into 20-26 rooms, 8 m doors on a spanning tree plus loops, start on the south wall, exit
+  on the north wall 6-10 doors away. **The first rooms are empty**: the start bay and its neighbours have no
+  furniture and nobody in them, the next ring is sparse with a few scientists, then rooms are furnished and
+  soldiers appear, more of them deeper; lock rooms and the exit are guarded.
 
 ## Locks (2–3 per run)
 
