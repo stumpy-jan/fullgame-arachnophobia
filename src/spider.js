@@ -38,7 +38,7 @@ export const spiderParams = {
   stepTime: 0.28,    // s per step at a walk (shorter when fast)
   legMargin: 0.18,   // m every part of a leg must keep from the world
   maxLead: 1.6,      // m: how far ahead of its rest spot a foot may be placed, however fast (stays in reach)
-  raiseFront: true,  // sprinting: the front pair lifts and is held up and forward (runs on six)
+  raiseFront: false, // sprinting: the front pair lifts and is held up and forward (runs on six); off: all eight run
 };
 
 const FEMUR = 2.6, TIBIA = 2.6, META = 1.3, META_TILT = 0.22, REACH = FEMUR + TIBIA;
