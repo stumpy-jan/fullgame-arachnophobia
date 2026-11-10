@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildLab } from './lab.js';
+import { buildWorld } from './world/world.js';
+import { makeLabLayout } from './world/layout.js';
 import { Spider } from './spider.js';
 import { Post, postParams } from './post.js';
 import { softDot } from './textures.js';
@@ -29,7 +30,8 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.12;
 scene.fog = new THREE.FogExp2(0x030506, 0.012);
 
-const lab = buildLab(scene);
+// the level: a layout (plain data; hand-made now, generated later) built into meshes + query services
+const lab = buildWorld(scene, makeLabLayout());
 const spider = new Spider(scene, lab);
 spider.place(lab.spawn.x, lab.spawn.z, lab.spawn.heading);
 if (Q.get('at')) { const [x, z, h] = Q.get('at').split(',').map(Number); spider.place(x, z, h || 0); }
@@ -51,7 +53,11 @@ const CAM = { height: 34, back: 17 };
 if (Q.get('cam')) { const [h, b] = Q.get('cam').split(',').map(Number); CAM.height = h; CAM.back = b; }
 const camTarget = new THREE.Vector3().copy(spider.pos);
 let shake = 0;
+// ?eye=x,y,z&look=x,y,z: a fixed debug camera; ?hide: no spider (for inspecting the level)
+const EYE = Q.get('eye') && Q.get('eye').split(',').map(Number), LOOK = Q.get('look') ? Q.get('look').split(',').map(Number) : [0, 0, 0];
+if (Q.has('hide')) spider.root.parent.traverse((o) => { if (o.isMesh && (o.parent === spider.root || spider.root.children.includes(o.parent) || o.material?.map === spider.legs[0].femur.material.map)) o.visible = false; });
 function updateCamera(dt, t) {
+  if (EYE) { camera.position.set(...EYE); camera.lookAt(...LOOK); return; }
   const lead = new THREE.Vector3(spider.vel.x * 0.45, 0, spider.vel.z * 0.45);
   camTarget.x = damp(camTarget.x, spider.pos.x + lead.x, 3.5, dt);
   camTarget.z = damp(camTarget.z, spider.pos.z + lead.z, 3.5, dt);

@@ -21,8 +21,16 @@ URL switches: `?auto` autopilot, `?cam=height,back` camera distance, `?at=x,z,he
   the leg hovers and the others carry the body. Planted legs are re-checked a moment ahead and step before they
   would clip; swings go up-across-down over obstacles and are checked mid-swing. Body height: above what's
   under it (with look-ahead) and the crests its legs reach over, below what planted legs can reach.
-- `src/lab.js`: the floor plan, flat-topped props, lights. Everything walkable is a flat-topped box or
-  cylinder, rasterised into a 10 cm height grid, so `heightAt(x, z)` is a lookup. Partition walls are 1.2 m thick and walkable: feet plant on them and the body rises over them (it samples the ground ahead, so it lifts before it gets there). Only the outer shell holds it in.
+- : the level, split so a procedural generator only has to produce data:
+  - : a layout is plain data (bounds, typed rooms, wall centre lines, pieces ,
+    who spawns where, the spider's start).  is the hand-made first lab.
+  - : one builder per piece type (wall, column, bench, tank, rackRow, crateStack, drum, machine, lamp,
+    beacon, tape, stencil ...). Builders make meshes and register what they occupy: flat-topped solids (what
+    the spider stands on), bullet blockers, contact shadows. Dividing walls are an extruded concrete
+    cross-section with closed ends; columns go at every wall end automatically.
+  - :  builds any layout and serves the queries:  (a 10 cm
+    height grid),  (line of fire vs walls/columns/tall props, height-aware),  (outer
+    shell),  (a 0.5 m walk grid for people), .
 - `src/textures.js`: every texture is painted in code at load (concrete, wall panels, rack LEDs, screens,
   the spider's legs and veined abdomen).
 - `src/post.js`: after Skyward's post pass: HDR scene, quarter/sixteenth-res Gaussian haze and bloom,

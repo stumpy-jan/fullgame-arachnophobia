@@ -53,55 +53,6 @@ export function floorTextures() {
   return { map: canvasTexture(c), rough: canvasTexture(cr, { srgb: false }), normal: normalFromHeight(hgt, S, S, 3) };
 }
 
-// Partition walls: painted steel panels, dark scuffed base band, a hazard stripe, a lighter upper half.
-// u: 2 m per repeat; v: 0 (floor) .. 1 (top).
-export function wallTextures() {
-  const W = 512, H = 512;
-  const n = fbm(W, H, 6, 4, 21), f = fbm(W, H, 64, 2, 22);
-  const [c, g] = makeCanvas(W, H);
-  const img = g.createImageData(W, H);
-  const hgt = new Float32Array(W * H), rough = new Float32Array(W * H);
-  for (let y = 0; y < H; y++) {
-    const v = 1 - y / H; // 0 at the floor
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x, k = i * 4;
-      let r, gg, b;
-      if (v < 0.13) { r = 46; gg = 50; b = 52; }             // kick plate
-      else if (v < 0.155) {                                  // hazard stripe
-        const s = Math.floor((x + y * 1.0) / 18) % 2;
-        [r, gg, b] = s ? [196, 150, 30] : [26, 24, 20];
-      } else if (v < 0.58) { r = 70; gg = 86; b = 86; }      // lower panel: lab teal-grey
-      else { r = 132; gg = 138; b = 136; }                   // upper panel
-      let m = 0.78 + n[i] * 0.4;
-      if (v < 0.3) m *= 0.75 + v;                             // grime rising from the floor
-      const px = x % 256;
-      if (px < 2 || Math.abs(v - 0.58) < 0.004) m *= 0.45;   // panel seams
-      if (px > 4 && px < 8 && (Math.abs(v - 0.25) < 0.006 || Math.abs(v - 0.9) < 0.006)) m *= 0.6; // rivets row
-      hgt[i] = f[i] * 0.4 + n[i] * 0.3 - (px < 3 || Math.abs(v - 0.58) < 0.005 ? 1 : 0) - (v < 0.13 ? 0.3 : 0)
-        + ((px - 128) ** 2 + ((v * 512) % 64 - 32) ** 2 < 9 ? 0.6 : 0); // seams, the kick plate step, bolts
-      rough[i] = (v < 0.155 ? 0.55 : 0.68) + n[i] * 0.2 + (f[i] - 0.5) * 0.15;
-      img.data[k] = r * m; img.data[k + 1] = gg * m; img.data[k + 2] = b * m; img.data[k + 3] = 255;
-    }
-  }
-  g.putImageData(img, 0, 0);
-  return { map: canvasTexture(c), normal: normalFromHeight(hgt, W, H, 4), rough: greyTexture(rough, W, H) };
-}
-
-// Generic grime: tinted by each material's colour (map * color).
-export function grimeTexture() {
-  const S = 512;
-  const n = fbm(S, S, 4, 5, 31), e = fbm(S, S, 24, 2, 32);
-  const [c, g] = makeCanvas(S, S);
-  const img = g.createImageData(S, S);
-  for (let i = 0; i < S * S; i++) {
-    const v = Math.min(1, 0.62 + n[i] * 0.45 + (e[i] - 0.5) * 0.15);
-    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v * 255;
-    img.data[i * 4 + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  return canvasTexture(c);
-}
-
 // Server rack fronts: rows of LEDs and drive bays. Returns { map, emissive }.
 export function rackTextures() {
   const W = 128, H = 512, R = rng(41);
