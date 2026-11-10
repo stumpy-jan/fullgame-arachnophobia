@@ -21,16 +21,16 @@ URL switches: `?auto` autopilot, `?cam=height,back` camera distance, `?at=x,z,he
   the leg hovers and the others carry the body. Planted legs are re-checked a moment ahead and step before they
   would clip; swings go up-across-down over obstacles and are checked mid-swing. Body height: above what's
   under it (with look-ahead) and the crests its legs reach over, below what planted legs can reach.
-- : the level, split so a procedural generator only has to produce data:
-  - : a layout is plain data (bounds, typed rooms, wall centre lines, pieces ,
-    who spawns where, the spider's start).  is the hand-made first lab.
-  - : one builder per piece type (wall, column, bench, tank, rackRow, crateStack, drum, machine, lamp,
+- `src/world/`: the level, split so a procedural generator only has to produce data:
+  - `layout.js`: a layout is plain data (bounds, typed rooms, wall centre lines, pieces `{ type, ...params }`,
+    who spawns where, the spider's start). `makeLabLayout()` is the hand-made first lab.
+  - `kit.js`: one builder per piece type (wall, column, bench, tank, rackRow, crateStack, drum, machine, lamp,
     beacon, tape, stencil ...). Builders make meshes and register what they occupy: flat-topped solids (what
     the spider stands on), bullet blockers, contact shadows. Dividing walls are an extruded concrete
     cross-section with closed ends; columns go at every wall end automatically.
-  - :  builds any layout and serves the queries:  (a 10 cm
-    height grid),  (line of fire vs walls/columns/tall props, height-aware),  (outer
-    shell),  (a 0.5 m walk grid for people), .
+  - `world.js`: `buildWorld(scene, layout)` builds any layout and serves the queries: `heightAt` (a 10 cm
+    height grid), `shotHit` (line of fire vs walls, columns and tall props, height-aware), `collide` (outer
+    shell), `nav` (a 0.5 m walk grid for people), `roomAt`.
 - `src/textures.js`: every texture is painted in code at load (concrete, wall panels, rack LEDs, screens,
   the spider's legs and veined abdomen).
 - `src/post.js`: after Skyward's post pass: HDR scene, quarter/sixteenth-res Gaussian haze and bloom,
