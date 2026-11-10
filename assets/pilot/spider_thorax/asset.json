@@ -1,0 +1,74 @@
+{
+  "title": "Spider cephalothorax",
+  "concept": "The body of a giant mutant spider seen from above, a lean low carapace.",
+  "sheet": "Studio product photograph of a single empty crab carapace shell on its own, no legs, no claws, no eyes: a low oval domed shell 1.6 m long and 1.4 m wide, a raised central ridge with a deep pit in the middle, grooves radiating out to a thick rim, coloured dark brown-black like a tarantula, satin lacquered chitin with subtle reddish-brown mottling and a few short stiff bristles. Seen from the front three-quarter above. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 4,000 triangles, 1K maps. Rigid part on the root; the face mask covers its front.",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            40,
+            25,
+            22
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_45_3.glb",
+    "fit": [
+      "x",
+      1.6
+    ],
+    "faces": 4000,
+    "texture": 1024,
+    "looks": {
+      "body": {
+        "color": [
+          0.03,
+          0.018,
+          0.014
+        ],
+        "shade": [
+          0.012,
+          0.007,
+          0.006
+        ],
+        "roughness": 0.42,
+        "pattern": "pores",
+        "scale": 60,
+        "bump": 0.12,
+        "texture_color": 1,
+        "sheen": 0.3,
+        "cavity": {
+          "color": [
+            0.004,
+            0.002,
+            0.002
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.09,
+            0.04,
+            0.025
+          ],
+          "amount": 0.2,
+          "roughness": 0.3
+        },
+        "metallic": 0
+      }
+    },
+    "thicken_m": 0.006
+  },
+  "picks": {
+    "sheet": "img_45_3.png"
+  }
+}

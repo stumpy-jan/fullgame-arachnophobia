@@ -3,6 +3,35 @@ import { clamp, damp, angleTo, rng } from './util.js';
 import { legTextures, chitinTextures } from './textures.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { model } from './world/models.js';
+
+// AI-made body parts (assets/pilot/spider_*: concept image, mesh, Blender finish), loaded by main.js before the
+// spider is built. Each fills the box the procedural part filled; without them the procedural body stays.
+export const SPIDER_PARTS = ['spider_abdomen']; // (+ spider_thorax with ?carapace: not yet better than the procedural one)
+// how each mesh came out of the mesher, turned to the body's frame (up +y, front +z): the carapace was meshed
+// standing up, facing the camera; the abdomen lying turned, its spinnerets off to the front right
+const PART_TURN = { spider_thorax: [-Math.PI / 2, 0, 0], spider_abdomen: [0, 2.49, 0] };
+function aiPart(name, size, look) {
+  const m = model(name);
+  if (!m) return null;
+  m.rotation.set(...(PART_TURN[name] || [0, 0, 0]));
+  const g = new THREE.Group(); g.add(m); g.updateMatrixWorld(true);
+  // its core, not its bounding box: spines and bristles stick out past the body, so measure between the
+  // 3rd and 97th percentile of its vertices on each axis and fit that to the box
+  const xs = [], ys = [], zs = [], v = new THREE.Vector3();
+  m.traverse((o) => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); xs.push(v.x); ys.push(v.y); zs.push(v.z); }
+    // the spider's satin over the part's own baked maps (the baked colour is near-black under our lights)
+    o.material = look(o.material);
+  });
+  const span = (arr) => { arr.sort((p, q) => p - q); const lo = arr[Math.floor(arr.length * 0.03)], hi = arr[Math.floor(arr.length * 0.97)]; return [hi - lo, (hi + lo) / 2]; };
+  const [sx, cx] = span(xs), [sy, cy] = span(ys), [sz, cz] = span(zs);
+  m.position.set(-cx, -cy, -cz);
+  g.scale.set(size.x / sx, size.y / sy, size.z / sz);
+  return g;
+}
 
 // The specimen: a giant spider, animated entirely in code.
 //
@@ -94,7 +123,14 @@ export class Spider {
 
     // cephalothorax (forward is +z): lean and low
     this.thorax = add(this.root, lump(0.05, 4, 1), chitin, 0, 0, 0.18, 0.72, 0.4, 0.8); // (its front pulled back: the mask is the front of the head)
-    add(this.root, lump(0.06, 5, 2), chitin, 0, 0.22, 0.32, 0.44, 0.24, 0.6); // the raised carapace hump
+    const hump = add(this.root, lump(0.06, 5, 2), chitin, 0, 0.22, 0.32, 0.44, 0.24, 0.6); // the raised carapace hump
+    const baked = (k) => (o) => satin({ map: o.map, normal: o.normalMap, rough: o.roughnessMap }, { color: new THREE.Color(k, k * 0.9, k * 0.85), roughness: 1, normalScale: new THREE.Vector2(1, 1) });
+    const shell = aiPart('spider_thorax', new THREE.Vector3(1.5, 0.6, 1.55), baked(0.55));
+    if (shell) { // the generated carapace replaces both lumps
+      shell.position.set(0, 0.1, 0.16); this.root.add(shell);
+      this.thorax.visible = hump.visible = false;
+      shell.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+    }
     // the face: a mask grown out of its own chitin over the front of the carapace (loadMask), two eyes in it
     this.maskMat = satin(chitinTextures(73, [92, 74, 64]), { normalScale: new THREE.Vector2(0.35, 0.35) }); // smoother: carved, not hairy
     this.eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x030102, emissive: 0xff1806, emissiveIntensity: 0.22, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02 });
@@ -118,6 +154,8 @@ export class Spider {
     add(this.abPivot, sphere, chitin, 0, 0.03, -0.2, 0.3, 0.26, 0.32); // pedicel
     this.abdomen = add(this.abPivot, lump(0.05, 4, 5), this.abMat, 0, 0.18, -1.15, 0.78, 0.62, 1.05);
     this.abdomen.rotation.x = -0.15;
+    const sac = aiPart('spider_abdomen', new THREE.Vector3(2, 2, 2), baked(2.6)); // (fills the unit sphere's box: the abdomen's scale still sizes and breathes it)
+    if (sac) { this.abdomen.material = new THREE.MeshBasicMaterial({ visible: false }); this.abdomen.castShadow = false; this.abdomen.add(sac); }
     this.abBase = this.abdomen.scale.clone();
     // spinnerets
     add(this.abPivot, new THREE.ConeGeometry(0.1, 0.26, 10), chitin, 0, 0.05, -2.2).rotation.x = -Math.PI / 2 - 0.4;

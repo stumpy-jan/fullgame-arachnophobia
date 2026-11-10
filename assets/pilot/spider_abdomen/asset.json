@@ -1,0 +1,73 @@
+{
+  "title": "Spider abdomen",
+  "concept": "The swollen abdomen of a giant mutant spider.",
+  "sheet": "Studio product photograph of a natural-history sculpture: a single smooth egg-shaped organic sac, 2.1 m long, 1.5 m wide and 1.2 m tall, faint segmented bands across its back, a darker chevron pattern down the spine, a small cluster of stubby nubs at the narrow end, dark brown-black lacquered chitin with a satin sheen, subtle reddish-brown mottling, almost hairless, a few short stiff bristles. Seen from the side three-quarter above. A single object alone, nothing else, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 4,000 triangles, 1K maps. Rigid part on the abdomen pivot (breathes by scale).",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            40,
+            25,
+            22
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_33_3.glb",
+    "fit": [
+      "x",
+      2.1
+    ],
+    "faces": 4000,
+    "texture": 1024,
+    "looks": {
+      "body": {
+        "color": [
+          0.03,
+          0.018,
+          0.014
+        ],
+        "shade": [
+          0.012,
+          0.007,
+          0.006
+        ],
+        "roughness": 0.42,
+        "pattern": "pores",
+        "scale": 60,
+        "bump": 0.12,
+        "texture_color": 1,
+        "sheen": 0.3,
+        "cavity": {
+          "color": [
+            0.004,
+            0.002,
+            0.002
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.09,
+            0.04,
+            0.025
+          ],
+          "amount": 0.2,
+          "roughness": 0.3
+        },
+        "metallic": 0
+      }
+    }
+  },
+  "picks": {
+    "sheet": "img_33_3.png"
+  }
+}

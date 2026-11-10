@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWorld } from './world/world.js';
 import { makeLabLayout } from './world/layout.js';
 import { loadModels } from './world/models.js';
-import { Spider } from './spider.js';
+import { Spider, SPIDER_PARTS } from './spider.js';
 import { Post, postParams } from './post.js';
 import { softDot } from './textures.js';
 import { damp, clamp } from './util.js';
@@ -38,7 +38,7 @@ scene.fog = new THREE.FogExp2(0x030506, 0.012);
 
 // the level: a layout (plain data; hand-made now, generated later) built into meshes + query services
 // (the AI-made models first: the kit places them as it builds)
-await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley']);
+await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...(Q.has('classic') ? [] : SPIDER_PARTS), ...(Q.has('carapace') ? ['spider_thorax'] : [])]); // (?classic: the procedural spider)
 const lab = buildWorld(scene, makeLabLayout());
 const spider = new Spider(scene, lab);
 spider.place(lab.spawn.x, lab.spawn.z, lab.spawn.heading);

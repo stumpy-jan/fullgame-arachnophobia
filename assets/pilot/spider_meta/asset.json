@@ -1,0 +1,18 @@
+{
+  "title": "Spider metatarsus",
+  "concept": "The lower leg and claw of a giant spider.",
+  "sheet": "Studio product photograph of a single long thin straight tapered rod sculpture, 1.3 m long, 0.14 m thick at the left end tapering to a single small hooked black point at the right end, a small collar at the left end, smooth satin dark brown-black lacquer with subtle reddish-brown mottling. Side view, lying horizontally, both ends fully in frame. A single object alone, nothing else, generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 800 triangles, 1K maps. Eight instances; the claw is the foot.",
+  "finish": {
+    "fit": [
+      "x",
+      1.3
+    ]
+  }
+}

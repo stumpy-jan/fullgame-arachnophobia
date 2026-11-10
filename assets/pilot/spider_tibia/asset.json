@@ -1,0 +1,18 @@
+{
+  "title": "Spider tibia",
+  "concept": "The middle leg segment of a giant spider.",
+  "sheet": "Studio product photograph of a single long straight tapered cylinder sculpture, 2.6 m long, 0.25 m thick at the left end tapering evenly to 0.12 m at the right end, a ridged collar at the left end, a few short black thorns, smooth satin dark brown-black lacquer with subtle reddish-brown mottling. Side view, lying horizontally, both ends fully in frame. A single object alone, nothing else, generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 1,200 triangles, 1K maps. Eight instances.",
+  "finish": {
+    "fit": [
+      "x",
+      2.6
+    ]
+  }
+}

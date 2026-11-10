@@ -1,0 +1,18 @@
+{
+  "title": "Spider femur",
+  "concept": "One thick upper leg segment of a giant spider.",
+  "sheet": "Studio product photograph of a single long straight tapered cylinder sculpture, 2.6 m long and 0.35 m thick, a rounded knuckle at the left end, a slight waist in the middle, a swelling before a cupped socket at the right end, two thin ring grooves, a sparse row of short black thorns along the top, smooth satin dark brown-black lacquer with subtle reddish-brown mottling. Side view, lying horizontally, both ends fully in frame. A single object alone, nothing else, generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    11,
+    23,
+    37,
+    59
+  ],
+  "notes": "Budget: 1,500 triangles, 1K maps. Eight instances; stretched a little by the IK along its length.",
+  "finish": {
+    "fit": [
+      "x",
+      2.6
+    ]
+  }
+}

@@ -9,6 +9,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 export const FIT = {
   centrifuge: ['y', 1.1], hazmat_locker: ['y', 1.9], lab_trolley: ['y', 0.9], generator: ['max', 2.8],
   hazmat_hood: ['y', 0.34], rifle: ['max', 0.9],
+  spider_thorax: ['max', 1.7], spider_abdomen: ['max', 2.1],
 };
 
 let loader = null;
