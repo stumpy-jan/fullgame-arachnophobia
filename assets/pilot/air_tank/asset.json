@@ -1,0 +1,71 @@
+{
+  "title": "Air tank",
+  "concept": "Soldiers in yellow hazmat suits carrying breathing air on their backs.",
+  "sheet": "Studio product photograph of a single breathing-apparatus air cylinder strapped to a black plastic backpack frame: a dull grey metal cylinder with rounded ends, one yellow band round it and a black valve and short hose at the top, held to the flat black back plate by two black straps. Back three-quarter view, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no person, no floor, no shadows, no text or logos.",
+  "seeds": [
+    61
+  ],
+  "notes": "Budget: 1,500 triangles, 512 maps (rigid, on the people skeleton's chest bone, behind the back).",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_61_0.glb",
+    "fit": [
+      "y",
+      0.55
+    ],
+    "faces": 8000,
+    "thicken_m": 0.004,
+    "shrinkwrap_reach": 0.006,
+    "texture": 512,
+    "looks": {
+      "body": {
+        "color": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "shade": [
+          0.35,
+          0.35,
+          0.35
+        ],
+        "roughness": 0.55,
+        "pattern": "metal",
+        "scale": 40,
+        "bump": 0.15,
+        "texture_color": 0.8,
+        "cavity": {
+          "color": [
+            0.03,
+            0.03,
+            0.03
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.6,
+            0.6,
+            0.6
+          ],
+          "amount": 0.25,
+          "roughness": 0.35
+        },
+        "metallic": 0.3
+      }
+    }
+  },
+  "picks": {
+    "sheet": "img_61_0.png"
+  }
+}

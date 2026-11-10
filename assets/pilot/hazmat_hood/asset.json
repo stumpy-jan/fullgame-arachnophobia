@@ -1,72 +1,129 @@
 {
   "title": "Hazmat hood with respirator",
   "concept": "Soldiers in yellow hazmat suits sweeping a dark lab with torches.",
-  "sheet": "Studio product photograph of a yellow rubberised hazmat suit hood with a full-face respirator built in: a dark tinted visor and two round filter canisters at the cheeks, shown on its own as if worn by an invisible person, front three-quarter view. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "sheet": "Studio product photograph of a yellow rubberised hazmat hood that covers only the head, rounded like a diving helmet and ending in a short gathered ruff at the neck, no shoulders, no body: a full-face respirator built into it, a wide dark tinted visor and two round black filter canisters at the cheeks. Shown on its own, empty, as if worn by an invisible person, front three-quarter view. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
   "seeds": [
     11,
     23,
     37,
-    59
+    59,
+    61
   ],
-  "notes": "Budget: 2,000 triangles, 1K maps (a rigid part fixed to the procedural skeleton's head bone). Gameplay camera sees it at about 4 cm per pixel.",
-  "picks": {
-    "sheet": "img_21_2.png"
-  },
+  "notes": "Budget: 2,000 triangles, 1K maps (a rigid part on the people skeleton's head bone, so head only: shoulders would clip when the head turns). Gameplay camera sees it at about 4 cm per pixel.",
   "finish": {
     "zones": {
-      "body": {
+      "fabric": {
         "samples": [
           [
-            128,
-            128,
-            128
+            200,
+            170,
+            40
+          ],
+          [
+            150,
+            120,
+            20
+          ]
+        ]
+      },
+      "mask": {
+        "samples": [
+          [
+            25,
+            25,
+            25
+          ],
+          [
+            60,
+            60,
+            60
           ]
         ]
       }
     },
-    "raw": "raw_img_21_2.glb",
+    "raw": "raw_img_61_0.glb",
     "fit": [
       "z",
       0.34
     ],
-    "faces": 4000,
+    "faces": 8000,
     "texture": 1024,
     "looks": {
-      "body": {
+      "fabric": {
         "color": [
           0.5,
-          0.5,
-          0.5
+          0.32,
+          0.015
         ],
         "shade": [
-          0.35,
-          0.35,
-          0.35
+          0.34,
+          0.2,
+          0.01
         ],
-        "roughness": 0.45,
+        "roughness": 0.5,
         "pattern": "felt",
         "scale": 60,
         "bump": 0.08,
-        "texture_color": 0.9,
         "cavity": {
           "color": [
-            0.03,
-            0.03,
-            0.03
+            0.08,
+            0.05,
+            0.01
           ],
           "amount": 0.5
         },
         "edge": {
           "color": [
-            0.7,
-            0.6,
-            0.1
+            0.62,
+            0.45,
+            0.05
           ],
-          "amount": 0.1,
-          "roughness": 0.4
+          "amount": 0.15,
+          "roughness": 0.45
+        }
+      },
+      "mask": {
+        "color": [
+          0.03,
+          0.03,
+          0.035
+        ],
+        "shade": [
+          0.012,
+          0.012,
+          0.014
+        ],
+        "roughness": 0.35,
+        "pattern": "grain",
+        "scale": 80,
+        "bump": 0.05,
+        "cavity": {
+          "color": [
+            0.005,
+            0.005,
+            0.005
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.12,
+            0.12,
+            0.13
+          ],
+          "amount": 0.2,
+          "roughness": 0.3
         }
       }
     },
-    "thicken_m": 0.003
+    "thicken_m": 0.003,
+    "shrinkwrap_reach": 0.002
+  },
+  "sheet_v1": "Studio product photograph of a yellow rubberised hazmat suit hood with a full-face respirator built in: a dark tinted visor and two round filter canisters at the cheeks, shown on its own as if worn by an invisible person, front three-quarter view. Whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "picks_v1": {
+    "sheet": "img_21_2.png"
+  },
+  "picks": {
+    "sheet": "img_61_0.png"
   }
 }

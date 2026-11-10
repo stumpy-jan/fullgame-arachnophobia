@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { rng, makeCanvas, fbm, canvasTexture } from '../util.js';
 import { normalFromHeight } from '../textures.js';
+import { model, hasModel } from '../world/models.js';
 
 // B, second pass: sculpted procedural people.
 // A skeleton of groups (hips > spine > chest > neck > head; hips > thigh > shin > foot; chest > upper arm >
@@ -37,7 +38,17 @@ function clothNormal() {
 // the wet red of a cut (shared: it batches)
 const STUMP = new THREE.MeshStandardMaterial({ color: 0x5a0606, roughness: 0.32, metalness: 0 });
 
-export function sculpted(type, { dark = false, seed = 1 } = {}) {
+// The soldier's AI-made gear (assets/pilot: Qwen image, Pixal3D mesh, Blender finish), used in place of the
+// procedural hood, tank and rifle once loaded (loadModels with GEAR_MODELS; without them the procedural parts
+// stay). Mount: [model, bone-local centre, turn about y, colour scale]. Clones share geometry and materials, so they batch.
+export const GEAR = {
+  hood: ['hazmat_hood', [0, -0.03, 0.01], 0],          // on the head; the visor faces +z
+  tank: ['air_tank', [0, 0.2, -0.2], Math.PI],         // on the chest, behind the back; the cylinder faces out
+  rifle: ['rifle', [0, -0.02, 0.05], -Math.PI / 2, 0.4], // in the gun group; the muzzle (+x in the model) to +z; darkened (it read silver in the lab's light)
+};
+export const GEAR_MODELS = Object.values(GEAR).map((g) => g[0]);
+
+export function sculpted(type, { dark = false, seed = 1, gear = true } = {}) {
   const R = rng(seed * 7919 + 13);
   const soldier = type === 'soldier';
   const pick = (a) => a[Math.floor(R() * a.length)];
@@ -98,26 +109,41 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
   // --- head and clothes
   let coatTail = null, gun = null, flash = null, laser = null, torch = null;
   if (soldier) {
-    const hood = add(C(THREE.SphereGeometry, 0.13, 18, 14), M.hood, head, 0, 0.02, -0.01);
-    hood.scale.set(0.98, 1.08, 1.04);
-    const mask = add(C(THREE.SphereGeometry, 0.1, 16, 12, -1.0, 2.0, 0.85, 1.0), visor, head, 0, 0.03, 0.04);
-    mask.scale.set(1.2, 1.15, 1.15);
-    for (const s of [-1, 1]) { const can = add(C(THREE.CylinderGeometry, 0.035, 0.035, 0.05, 12), M.tank, head, 0.07 * s, -0.06, 0.09); can.rotation.set(1.2, 0, -0.5 * s); }
+    // an AI part on a bone: centred on its mount, counter-scaled for the body's scale (it's sized in metres)
+    const wear = (k, bone) => {
+      if (!gear || dark || !hasModel(GEAR[k][0])) return null;
+      const [name, [x, y, z], ry, tint] = GEAR[k], m = model(name), s = SCALE * size;
+      if (tint) m.traverse((o) => { if (o.isMesh) o.material.color.setScalar(tint); }); // (shared by every clone: set, not scaled)
+      m.scale.setScalar(1 / s); m.position.set(x, y - m.userData.size.y / 2 / s, z); m.rotation.y = ry;
+      bone.add(m);
+      return m;
+    };
+    if (!wear('hood', head)) {
+      const hood = add(C(THREE.SphereGeometry, 0.13, 18, 14), M.hood, head, 0, 0.02, -0.01);
+      hood.scale.set(0.98, 1.08, 1.04);
+      const mask = add(C(THREE.SphereGeometry, 0.1, 16, 12, -1.0, 2.0, 0.85, 1.0), visor, head, 0, 0.03, 0.04);
+      mask.scale.set(1.2, 1.15, 1.15);
+      for (const s of [-1, 1]) { const can = add(C(THREE.CylinderGeometry, 0.035, 0.035, 0.05, 12), M.tank, head, 0.07 * s, -0.06, 0.09); can.rotation.set(1.2, 0, -0.5 * s); }
+    }
     add(C(THREE.TorusGeometry, 0.165, 0.022, 6, 20), M.belt, hips, 0, 0.03, 0).rotation.x = Math.PI / 2;
-    const tank = add(C(THREE.CapsuleGeometry, 0.085, 0.3, 4, 10), M.tank, chest, 0, 0.12, -0.17);
-    void tank;
+    if (!wear('tank', chest)) add(C(THREE.CapsuleGeometry, 0.085, 0.3, 4, 10), M.tank, chest, 0, 0.12, -0.17);
     const hose = C(THREE.TubeGeometry, new THREE.CatmullRomCurve3([new THREE.Vector3(0.05, 0.32, -0.17), new THREE.Vector3(0.14, 0.38, -0.05), new THREE.Vector3(0.1, 0.42, 0.08), new THREE.Vector3(0.06, 0.58, 0.12)]), 12, 0.015, 6);
     add(hose, M.belt, chest);
-    // the rifle, held by the right hand: body, stock, magazine, barrel
+    // the rifle, held by the right hand: body, stock, magazine, barrel (or the AI one); the flash and laser at its muzzle
     gun = G(chest, 0.1, 0.2, 0.22);
-    add(C(THREE.BoxGeometry, 0.06, 0.1, 0.42), M.gun, gun, 0, 0, 0.05);
-    add(C(THREE.BoxGeometry, 0.05, 0.09, 0.22), M.gun, gun, 0, -0.02, -0.25);
-    add(C(THREE.BoxGeometry, 0.04, 0.14, 0.06), M.gun, gun, 0, -0.1, 0.1).rotation.x = 0.2;
-    add(C(THREE.CylinderGeometry, 0.012, 0.012, 0.3, 8), M.gun, gun, 0, 0.02, 0.4).rotation.x = Math.PI / 2;
+    const rifle = wear('rifle', gun);
+    let muzzle = 0.55;
+    if (rifle) muzzle = GEAR.rifle[1][2] + Math.max(rifle.userData.size.x, rifle.userData.size.z) / 2 / (SCALE * size);
+    else {
+      add(C(THREE.BoxGeometry, 0.06, 0.1, 0.42), M.gun, gun, 0, 0, 0.05);
+      add(C(THREE.BoxGeometry, 0.05, 0.09, 0.22), M.gun, gun, 0, -0.02, -0.25);
+      add(C(THREE.BoxGeometry, 0.04, 0.14, 0.06), M.gun, gun, 0, -0.1, 0.1).rotation.x = 0.2;
+      add(C(THREE.CylinderGeometry, 0.012, 0.012, 0.3, 8), M.gun, gun, 0, 0.02, 0.4).rotation.x = Math.PI / 2;
+    }
     flash = new THREE.Mesh(C(THREE.SphereGeometry, 0.09, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 6, 2.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-    flash.position.set(0, 0.02, 0.6); flash.visible = false; gun.add(flash);
+    flash.position.set(0, 0.02, muzzle + 0.05); flash.visible = false; gun.add(flash);
     laser = new THREE.Mesh(cached('laser', () => new THREE.BoxGeometry(0.008, 0.008, 16).translate(0, 0, 8)), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.25, 0.12), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-    laser.position.set(0, 0.04, 0.55); gun.add(laser);
+    laser.position.set(0, 0.04, muzzle); gun.add(laser);
     torch = new THREE.Mesh(cached('torch', () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ map: coneTexture(), color: new THREE.Color(1.15, 1.0, 0.72), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     torch.rotation.y = Math.PI; torch.position.set(0, 0.012, 3.4); torch.scale.set(3.2, 1, 5.6); root.add(torch);
   } else {

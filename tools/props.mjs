@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
-const BUDGET = { centrifuge: 4000, hazmat_locker: 5000, lab_trolley: 3000, generator: 15000, hazmat_hood: 2000, rifle: 1500 };
+const BUDGET = { centrifuge: 4000, hazmat_locker: 5000, lab_trolley: 3000, generator: 15000, hazmat_hood: 2000, rifle: 1500, air_tank: 1500, spider_thorax: 4000, spider_abdomen: 4000 };
 const TEX = { generator: 2048 };
 const ROOT = 'assets/pilot', OUT = 'public/models/props';
 
@@ -24,7 +24,7 @@ for (const n of names) {
   const finished = [join(dir, n + '_clean.glb'), join(dir, n + '.glb')].find(existsSync);
   const raw = existsSync(dir) && readdirSync(dir).filter((f) => f.startsWith('raw_') && f.endsWith('.glb')).sort().pop();
   if (!finished && !raw) { console.log(n, 'no mesh yet'); continue; }
-  const src = finished || join(dir, raw), tris = triangles(src), ratio = finished ? 1 : Math.min(1, BUDGET[n] / tris);
+  const src = finished || join(dir, raw), tris = triangles(src), ratio = Math.min(1, (BUDGET[n] || tris) / tris); // (a finish baked above budget, so its maps stay clean, is simplified here)
   const out = join(OUT, `${n}.glb`);
   // the native gltfpack (tools/bin, from github.com/zeux/meshoptimizer releases): the npm build can't do KTX2
   execFileSync('tools/bin/gltfpack.exe', ['-i', src, '-o', out, '-si', ratio.toFixed(6), ...(process.env.AGGRESSIVE ? ['-sa'] : []), '-tc', '-tl', String(TEX[n] || 1024), '-cc'], { stdio: 'pipe' });
