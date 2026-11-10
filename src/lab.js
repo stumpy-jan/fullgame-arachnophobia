@@ -39,7 +39,6 @@ export function buildLab(scene) {
   // ---------------------------------------------------------------- materials
   const floorT = TX.floorTextures();
   for (const t of [floorT.map, floorT.rough, floorT.normal]) t.repeat.set(64 / 16, 44 / 16);
-  const wallT = TX.wallTextures();
   // worn paint / metal: three variants so neighbouring props don't share the same chips
   const W1 = TX.wornTextures(101), W2 = TX.wornTextures(202), W3 = TX.wornTextures(303);
   // a worn surface: colour x grime map, normal map, roughness map (x the material's roughness)
@@ -50,8 +49,6 @@ export function buildLab(scene) {
   const rack = TX.rackTextures();
   const M = {
     floor: new THREE.MeshStandardMaterial({ map: floorT.map, roughnessMap: floorT.rough, normalMap: floorT.normal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 1, metalness: 0 }),
-    wall: new THREE.MeshStandardMaterial({ map: wallT.map, normalMap: wallT.normal, roughnessMap: wallT.rough, roughness: 1, metalness: 0.1 }),
-    wallTop: worn(W1, 0x464c50, 1.1, 0.1),
     cabinet: worn(W1, 0x8a949a, 1.0, 0.2),                       // painted steel
     benchTop: worn(W2, 0x2a2d30, 0.7, 0.0, { normalScale: new THREE.Vector2(0.2, 0.2) }), // black resin, satin
     steel: worn(W3, 0x8d959a, 0.75, 0.8),                        // bare steel, scuffed
@@ -115,19 +112,73 @@ export function buildLab(scene) {
   outer.rotation.x = -Math.PI / 2;
 
   // ---------------------------------------------------------------- walls
+  // Dividing walls: the kind explosives plants build between bays so a blast in one doesn't carry to
+  // the next (and, it turns out, so gunfire doesn't either). Cast concrete: a plinth at the foot,
+  // near-vertical sides, a chamfered top with a flat crown the spider walks along; 3 m panels (the
+  // joints are in the texture) and a square column at every end and corner.
+  // Profile: [distance from the centre line, height].
+  const PROF = [[0.62, 0], [0.62, 0.25], [0.56, 0.31], [0.55, 3.1], [0.36, WALL_H], [-0.36, WALL_H], [-0.55, 3.1], [-0.56, 0.31], [-0.62, 0.25], [-0.62, 0]];
+  const COL = 0.78, COL_H = WALL_H + 0.15; // column half-size, height
+  const wallTex = TX.blastWallTextures(), topTex = TX.wallTopTextures();
+  M.wall = new THREE.MeshStandardMaterial({ map: wallTex.map, normalMap: wallTex.normal, roughnessMap: wallTex.rough, roughness: 1, metalness: 0 });
+  M.wallTop = new THREE.MeshStandardMaterial({ map: topTex.map, normalMap: topTex.normal, roughnessMap: topTex.rough, roughness: 1, metalness: 0 });
+  const columns = new Map(), walls = [];
   const wall = (x0, z0, x1, z1, outer = false) => {
     const horiz = Math.abs(z1 - z0) < 0.01;
-    const w = horiz ? Math.abs(x1 - x0) + WALL_T : WALL_T, d = horiz ? WALL_T : Math.abs(z1 - z0) + WALL_T;
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    const geo = new RoundedBoxGeometry(w, WALL_H, d, 2, 0.05);
-    contact(cx, cz, w, d);
-    // side faces: u along the wall at 2 m per repeat, v = full height (bands at the base)
-    boxUV(geo, 2, true);
-    const m = new THREE.Mesh(geo, [M.wall, M.wall, M.wallTop, M.wallTop, M.wall, M.wall]);
-    m.position.set(cx, WALL_H / 2, cz);
+    const L = horiz ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
+    const ax = horiz ? Math.sign(x1 - x0) : 0, az = horiz ? 0 : Math.sign(z1 - z0); // along the wall
+    const px = horiz ? 0 : 1, pz = horiz ? 1 : 0;                                   // across it
+    const sx = x0 + ax * COL, sz = z0 + az * COL, len = L - 2 * COL;                  // between its end columns
+    const pos = [], nor = [], uv = [], idx = [], groups = [];
+    for (let i = 0; i < PROF.length - 1; i++) {
+      const [d0, y0] = PROF[i], [d1, y1] = PROF[i + 1];
+      const ed = d1 - d0, ey = y1 - y0, el = Math.hypot(ed, ey);
+      const nd = ey / el, ny = -ed / el;                 // outward normal of this edge in the cross-section
+      const crown = Math.abs(ey) < 1e-3;
+      const base = pos.length / 3;
+      for (const [s, d, y] of [[0, d0, y0], [len, d0, y0], [0, d1, y1], [len, d1, y1]]) {
+        pos.push(sx + ax * s + px * d, y, sz + az * s + pz * d);
+        nor.push(px * nd, ny, pz * nd);
+        // u along the wall (one texture repeat = one 3 m panel); v = height (bands at the foot), or across the crown
+        uv.push(s / 3, crown ? (d + 0.36) / 0.72 : y / WALL_H);
+      }
+      const P = (k) => new THREE.Vector3(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]);
+      const n = new THREE.Vector3(px * nd, ny, pz * nd);
+      const a = base, b = base + 1, c = base + 2, e = base + 3;
+      const facesOut = new THREE.Vector3().subVectors(P(b), P(a)).cross(new THREE.Vector3().subVectors(P(c), P(a))).dot(n) > 0;
+      groups.push([idx.length, crown ? 1 : 0]);
+      if (facesOut) idx.push(a, b, c, b, e, c); else idx.push(a, c, b, b, c, e);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    for (const [start, mi] of groups) geo.addGroup(start, 6, mi);
+    const m = new THREE.Mesh(geo, [M.wall, M.wallTop]);
     m.castShadow = m.receiveShadow = true;
     root.add(m);
-    box(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, WALL_H, true, outer);
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const w = horiz ? L : 1.24, d = horiz ? 1.24 : L;
+    contact(cx, cz, w, d);
+    solids.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, top: WALL_H, wall: true, outer, prof: { horiz, c: horiz ? cz : cx } });
+    walls.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 });
+    for (const [x, z] of [[x0, z0], [x1, z1]]) columns.set(`${x},${z}`, [x, z]);
+  };
+  // a column: a square post with a chamfered cap like the walls
+  const column = (x, z) => {
+    mesh(boxUV(new RoundedBoxGeometry(COL * 2, COL_H - 0.3, COL * 2, 2, 0.04), 3), M.wall, x, (COL_H - 0.3) / 2, z);
+    const cap = mesh(new THREE.CylinderGeometry(0.5 * Math.SQRT2, COL * Math.SQRT2, 0.3, 4, 1), M.wallTop, x, COL_H - 0.15, z);
+    cap.rotation.y = Math.PI / 4; // (a four-sided cylinder, turned: a square frustum)
+    contact(x, z, COL * 2, COL * 2);
+    box(x - COL, x + COL, z - COL, z + COL, COL_H - 0.3, true, false);
+    box(x - 0.5, x + 0.5, z - 0.5, z + 0.5, COL_H, true, false);
+    walls.push({ x0: x - COL, x1: x + COL, z0: z - COL, z1: z + COL });
+  };
+  // stencilled bay codes on the crowns (the face the camera sees)
+  const stencil = (x, z, text, across) => {
+    const m = mesh(new THREE.PlaneGeometry(1.5, 0.5), new THREE.MeshStandardMaterial({ map: TX.stencilTexture(text), transparent: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false }), x, WALL_H + 0.004, z, { cast: false });
+    m.rotation.set(-Math.PI / 2, 0, across ? Math.PI / 2 : 0);
   };
   // outer shell
   wall(-32, -22, 32, -22, true); wall(-32, 22, 32, 22, true); wall(-32, -22, -32, 22, true); wall(32, -22, 32, 22, true);
@@ -136,6 +187,9 @@ export function buildLab(scene) {
   wall(10, -22, 10, -7); wall(10, 1, 10, 22);
   wall(-32, 0, -25, 0); wall(-17, 0, -10, 0);
   wall(10, 6, 17, 6); wall(25, 6, 32, 6);
+  for (const [x, z] of columns.values()) column(x, z);
+  stencil(-10, -13, 'BAY 2', true); stencil(-10, 13, 'BAY 3', true); stencil(10, -14, 'BAY 4', true); stencil(10, 13, 'BAY 5', true);
+  stencil(-28.5, 0, 'W-1', false); stencil(28.5, 6, 'X-7', false);
 
   // hazard tape across each doorway
   // stripes run along the tape (u = length, 1.2 m per repeat); `across` turns it to run along z
@@ -317,13 +371,13 @@ export function buildLab(scene) {
   // red alarm beacons, sweeping
   const beacons = [];
   const beacon = (x, z, phase) => {
-    mesh(cylGeo(0.16, 0.2, 0.3, 16), M.beacon, x, WALL_H + 0.15, z, { cast: false });
+    mesh(cylGeo(0.16, 0.2, 0.3, 16), M.beacon, x, COL_H + 0.15, z, { cast: false });
     const l = new THREE.SpotLight(0xff2010, 260, 30, 0.42, 0.5, 2);
-    l.position.set(x, WALL_H + 0.3, z);
+    l.position.set(x, COL_H + 0.3, z);
     root.add(l, l.target);
     beacons.push({ l, x, z, phase });
   };
-  beacon(-10, -4.3, 0); beacon(10, 1.3, 2);
+  beacon(-10, -4, 0); beacon(10, 1, 2); // on the door columns
 
   // ---------------------------------------------------------------- queries
   // The height field: every solid rasterised at 10 cm into a grid (the spider asks thousands of times
@@ -338,7 +392,12 @@ export function buildLab(scene) {
       for (let i = i0; i <= i1; i++) {
         if (so.r !== undefined) { const dx = GX + (i + 0.5) * G - so.cx, dz = GZ + (k + 0.5) * G - so.cz; if (dx * dx + dz * dz > so.r * so.r) continue; }
         const j = k * GW + i;
-        if (so.top > grid[j]) grid[j] = so.top;
+        let top = so.top;
+        if (so.prof) { // a dividing wall: its cross-section, by distance from the centre line
+          const d = Math.abs((so.prof.horiz ? GZ + (k + 0.5) * G : GX + (i + 0.5) * G) - so.prof.c);
+          top = d <= 0.36 ? WALL_H : d <= 0.55 ? WALL_H - ((d - 0.36) / 0.19) * 0.3 : d <= 0.56 ? 3.1 : 0.25;
+        }
+        if (top > grid[j]) grid[j] = top;
       }
     }
   }
@@ -378,5 +437,24 @@ export function buildLab(scene) {
     [0, 6], [-14, 10], [-14, -12], [-26, -12], [-26, 12], [0, 16], [27, 16], [27, -12], [0, -16], [0, 4],
   ].map(([x, z]) => new THREE.Vector2(x, z));
 
-  return { root, heightAt, collide, update, route, spawn: { x: 0, z: 2.5, heading: 0 } };
+  // does a shot from a to b (x, z) pass through a wall or column? (the bullets stop on the concrete)
+  function blocked(ax, az, bx, bz) {
+    for (const w of walls) if (segBox(ax, az, bx, bz, w)) return true;
+    return false;
+  }
+  return { root, heightAt, collide, update, route, blocked, walls, spawn: { x: 0, z: 2.5, heading: 0 } };
+}
+
+// does segment a-b cross the axis-aligned rectangle w (slab test)?
+function segBox(ax, az, bx, bz, w) {
+  let t0 = 0, t1 = 1;
+  const dx = bx - ax, dz = bz - az;
+  for (const [p, d, lo, hi] of [[ax, dx, w.x0, w.x1], [az, dz, w.z0, w.z1]]) {
+    if (Math.abs(d) < 1e-9) { if (p < lo || p > hi) return false; continue; }
+    let u = (lo - p) / d, v = (hi - p) / d;
+    if (u > v) [u, v] = [v, u];
+    t0 = Math.max(t0, u); t1 = Math.min(t1, v);
+    if (t0 > t1) return false;
+  }
+  return true;
 }

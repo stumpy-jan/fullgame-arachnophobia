@@ -311,3 +311,104 @@ export function contactTexture(round) {
   g.filter = 'none';
   return canvasTexture(c, { repeat: false, srgb: false });
 }
+
+// ------------------------------------------------------------------------------------------------
+// Dividing walls: cast concrete. Faces: u = 3 m panel (the V-groove joint at the edge), v = height
+// (0 floor .. 1 top, 3.4 m). Formwork tie holes on a 0.75 m grid with rust bleeding down from some,
+// water/grime streaks from the top, darker damp band at the foot, the plinth a touch darker.
+export function blastWallTextures() {
+  const W = 512, H = 512, R = rng(81);
+  const n = fbm(W, H, 6, 5, 82), f = fbm(W, H, 64, 2, 83), st = fbm(W, H, 24, 3, 84);
+  const h = new Float32Array(W * H), rough = new Float32Array(W * H), alb = new Float32Array(W * H * 3);
+  for (let y = 0; y < H; y++) {
+    const v = 1 - y / H; // 0 at the floor
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x, u = x / W;
+      // vertical streaks: low-frequency in x, stretched in y
+      const streak = fbmAt(st, W, H, x, Math.floor(y * 0.12)) ;
+      let g = 0.5 + (n[i] - 0.5) * 0.25 + (f[i] - 0.5) * 0.12 - Math.max(0, streak - 0.55) * 0.5;
+      if (v < 0.09) g *= 0.82;                                   // plinth
+      g *= 0.78 + Math.min(1, v * 4) * 0.22;                     // damp at the foot
+      let hh = f[i] * 0.3 + n[i] * 0.2;
+      const joint = Math.min(u, 1 - u) * 3;                      // m from the panel joint
+      if (joint < 0.012) { g *= 0.45; hh -= 1; } else if (joint < 0.02) hh -= 0.4;
+      if (Math.abs(v - 0.09) < 0.004) { g *= 0.7; hh -= 0.4; }   // plinth line
+      alb[i * 3] = g * 1.0; alb[i * 3 + 1] = g * 0.99; alb[i * 3 + 2] = g * 0.96;
+      h[i] = hh;
+      rough[i] = 0.82 + (f[i] - 0.5) * 0.15 - Math.max(0, streak - 0.6) * 0.3;
+    }
+  }
+  // tie holes, some bleeding rust
+  for (let ty = 1; ty < 5; ty++) for (let tx = 0; tx < 4; tx++) {
+    const cx = Math.floor(((tx + 0.5) / 4) * W), cy = Math.floor((1 - ty * 0.2) * H);
+    const rust = R() < 0.35, run = 20 + R() * 120;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+      if (dx * dx + dy * dy > 14) continue;
+      const i = ((cy + dy + H) % H) * W + ((cx + dx + W) % W);
+      alb[i * 3] *= 0.4; alb[i * 3 + 1] *= 0.4; alb[i * 3 + 2] *= 0.4; h[i] -= 0.8;
+    }
+    if (rust) for (let dy = 0; dy < run; dy++) {
+      const wdt = 2 + dy * 0.03, fade = 1 - dy / run;
+      for (let dx = -wdt; dx <= wdt; dx++) {
+        const i = ((cy + dy + H) % H) * W + ((cx + Math.round(dx + Math.sin(dy * 0.15) * 2) + W) % W);
+        const a = 0.5 * fade * (1 - Math.abs(dx) / (wdt + 1));
+        alb[i * 3] = alb[i * 3] * (1 - a) + 0.42 * a; alb[i * 3 + 1] = alb[i * 3 + 1] * (1 - a) + 0.22 * a; alb[i * 3 + 2] = alb[i * 3 + 2] * (1 - a) + 0.1 * a;
+      }
+    }
+  }
+  return toSet(alb, h, rough, W, H, 4);
+}
+
+// The crowns (and column caps): u = 3 m along, v = across (0.72 m). Weathered, with two lifting-anchor
+// recesses per panel, each with a rust stain, and the arrises chipped.
+export function wallTopTextures() {
+  const W = 512, H = 128;
+  const n = fbm(W, H, 8, 4, 91), f = fbm(W, H, 64, 2, 92);
+  const h = new Float32Array(W * H), rough = new Float32Array(W * H), alb = new Float32Array(W * H * 3);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, u = x / W, v = y / H;
+    let g = 0.46 + (n[i] - 0.5) * 0.25 + (f[i] - 0.5) * 0.12;
+    let hh = f[i] * 0.4 + n[i] * 0.2;
+    const edge = Math.min(v, 1 - v);
+    if (edge < 0.05 && f[i] > 0.6) { g *= 0.7; hh -= 0.6; }    // chips along the arrises
+    if (Math.min(u, 1 - u) * 3 < 0.012) { g *= 0.45; hh -= 1; } // panel joint
+    for (const au of [0.22, 0.78]) {
+      const dx = (u - au) * 3, dy = (v - 0.5) * 0.72, r = Math.hypot(dx, dy);
+      if (r < 0.06) { g *= 0.35; hh -= 1; }
+      else if (r < 0.16) { const a = (1 - (r - 0.06) / 0.1) * 0.5 * (0.6 + n[i] * 0.6); g = g * (1 - a) + 0.3 * a; }
+    }
+    alb[i * 3] = g * (1 + (g < 0.4 ? 0.12 : 0)); alb[i * 3 + 1] = g * 0.98; alb[i * 3 + 2] = g * (g < 0.4 ? 0.85 : 0.95);
+    h[i] = hh;
+    rough[i] = 0.85 + (f[i] - 0.5) * 0.15;
+  }
+  return toSet(alb, h, rough, W, H, 4);
+}
+
+// Spray-painted stencil lettering (alpha), worn.
+export function stencilTexture(text) {
+  const W = 384, H = 128;
+  const [c, g] = makeCanvas(W, H);
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = 'rgba(220,180,40,0.92)';
+  g.font = 'bold 92px "Arial Black", Impact, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, W / 2, H / 2 + 4);
+  // stencil bridges and wear
+  const R = rng(text.length * 97);
+  g.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(0,0,0,${0.3 + R() * 0.7})`; g.beginPath(); g.arc(R() * W, R() * H, 1 + R() * 5, 0, Math.PI * 2); g.fill(); }
+  g.fillRect(0, H / 2 - 3, W, 4);
+  return canvasTexture(c, { repeat: false });
+}
+
+function fbmAt(a, W, H, x, y) { return a[((y % H) + H) % H * W + ((x % W) + W) % W]; }
+
+function toSet(alb, h, rough, W, H, strength) {
+  const [c, g] = makeCanvas(W, H);
+  const img = g.createImageData(W, H);
+  for (let i = 0; i < W * H; i++) {
+    img.data[i * 4] = Math.min(255, alb[i * 3] * 255); img.data[i * 4 + 1] = Math.min(255, alb[i * 3 + 1] * 255); img.data[i * 4 + 2] = Math.min(255, alb[i * 3 + 2] * 255); img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return { map: canvasTexture(c), normal: normalFromHeight(h, W, H, strength), rough: greyTexture(rough, W, H) };
+}
