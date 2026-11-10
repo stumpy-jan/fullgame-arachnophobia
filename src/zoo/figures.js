@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { TYPES } from '../people/types.js';
 import { softDot } from '../textures.js';
+import { sculpted as sculpted2 } from './sculpted.js';
 
 // Alternative ways to draw the people, for the zoo. Each maker returns { group, update(t, dt, pose) } where
 // pose = { phase, stride (0..1), aim (0..1), lean }. All built in metres at the game's 1.25x people scale.
@@ -127,8 +128,8 @@ export function operator(type) {
 // ------------------------------------------------------------------ D: silhouettes and lights
 // The sculpted figures in near-black, read by what they emit: amber visor slits and a torch cone for
 // soldiers, retroreflective stripes on the scientists' coats that flare in any light.
-export function silhouette(type) {
-  const f = sculpted(type, { dark: true });
+export function silhouette(type, opts = {}) {
+  const f = sculpted2(type, { ...opts, dark: true });
   const soldier = type === 'soldier';
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: coneTex(), color: soldier ? new THREE.Color(0.9, 0.75, 0.5) : new THREE.Color(0.15, 0.15, 0.15), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
   glow.position.set(0, 0.01, soldier ? 3.4 : 0.0); glow.scale.set(soldier ? 3.4 : 1.2, 1, soldier ? 6 : 1.2); glow.rotation.y = Math.PI;

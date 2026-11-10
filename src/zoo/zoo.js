@@ -4,7 +4,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Post } from '../post.js';
 import { floorMaterial, floorGeometry } from '../world/floors.js';
 import { Bodies } from '../people/bodies.js';
-import { sculpted, operator, silhouette } from './figures.js';
+import { operator, silhouette } from './figures.js';
+import { sculpted } from './sculpted.js';
 import { damp } from '../util.js';
 
 // The zoo: one approach to drawing the people per stage, side by side, in the game's own lighting and post
@@ -27,7 +28,7 @@ scene.add(new THREE.HemisphereLight(0x7a93a8, 0x0d0d0f, 0.22));
 
 const STAGES = [
   { name: 'A. Current', text: 'Capsules and spheres, instanced. Cheap, but the stiff limbs read as dolls.', make: null },
-  { name: 'B. Sculpted', text: 'Procedural, but shaped: tapered limbs, shoulders, a hood, a flared coat, and joints that bend (knees, elbows, pelvis bob, torso twist).', make: sculpted },
+  { name: 'B. Sculpted', text: 'Procedural, sculpted (pass 2): proportions, lab coats with a swinging tail and collar, hair and skin variety, hazmat suits with respirator, tank and hose, a proper rifle; a run with folding knees, hip and shoulder twist, glances back; an aiming stance with recoil.', make: sculpted },
   { name: 'C. Operators', text: 'Abstract: no arms or legs, a hooded silhouette that glides; an oversized floating rifle with a laser sight and a torch cone; scientists carry a glowing tablet.', make: operator },
   { name: 'D. Lights', text: 'Near-black silhouettes in the dark lab, read by what they emit: amber visor slits and torch cones (soldiers), reflective coat stripes (scientists).', make: silhouette },
 ];
@@ -51,9 +52,10 @@ beacon.position.set(GAP * 1.5, 4, -9); scene.add(beacon, beacon.target);
 const bodies = new Bodies(scene, 8);
 const actors = [];
 STAGES.forEach((st, i) => {
-  for (const [type, mode, k] of [['scientist', 'run', 0], ['soldier', 'run', 1], ['soldier', 'aim', 2]]) {
+  for (const [type, mode, k] of [['scientist', 'run', 0], ['soldier', 'run', 1], ['soldier', 'aim', 2], ['scientist', 'run', 3], ['scientist', 'idle', 4]]) {
     const a = { stage: i, type, mode, k, x: i * GAP, z: 0, heading: 0, phase: k * 2, stride: 0, aim: 0, lean: 0, fall: 0, tilt: 0, flail: false, y: 0 };
-    if (st.make) { a.fig = st.make(type); scene.add(a.fig.group); }
+    a.fireT = 9; a.shot = 0; a.panic = 0;
+    if (st.make) { a.fig = st.make(type, { seed: i * 10 + k + 1 }); scene.add(a.fig.group); }
     actors.push(a);
   }
 });
@@ -80,12 +82,17 @@ function frame(now) {
   for (const a of actors) {
     const cx = a.stage * GAP;
     if (a.mode === 'run') {
-      const r = 2.6, w = (a.type === 'scientist' ? 1.8 : 1.4) / r, ang = time * w + a.k * Math.PI;
+      const r = a.k === 3 ? 3.8 : 2.6, w = (a.type === 'scientist' ? 1.8 : 1.4) / r, ang = time * w + a.k * Math.PI * 0.7;
       a.x = cx + Math.cos(ang) * r; a.z = Math.sin(ang) * r; a.heading = Math.atan2(-Math.sin(ang), Math.cos(ang));
-      a.stride = 1; a.phase += w * r * 3.1 * dt; a.lean = a.type === 'scientist' ? 0.28 : 0.15; a.aim = 0;
+      a.stride = 1; a.phase += w * r * 3.1 * dt; a.lean = a.type === 'scientist' ? 0.28 : 0.15; a.aim = 0; a.panic = a.type === 'scientist' ? 1 : 0;
+    } else if (a.mode === 'idle') {
+      a.x = cx + 2.4; a.z = -2.2; a.heading = 2.4 + Math.sin(time * 0.4) * 0.6; a.stride = 0; a.lean = 0.02;
     } else {
       a.x = cx + 0.0; a.z = 0; a.heading = Math.sin(time * 0.5) * 1.2; a.stride = 0; a.lean = 0.08;
       a.aim = damp(a.aim, Math.sin(time * 0.7) > -0.3 ? 1 : 0, 6, dt);
+      // bursts of four while aimed
+      a.fireT += dt; a.shot -= dt;
+      if (a.aim > 0.9 && a.shot <= 0) { a.fireT = 0; a.burst = (a.burst || 0) + 1; a.shot = a.burst % 4 ? 0.11 : 0.9; }
     }
     if (a.fig) { a.fig.group.position.set(a.x, 0, a.z); a.fig.group.rotation.y = a.heading; a.fig.update(time, dt, a); }
   }
