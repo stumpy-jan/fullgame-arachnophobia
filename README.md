@@ -8,9 +8,9 @@ npm install
 npm run dev        # http://localhost:5391
 ```
 
-Controls: WASD / arrows move (screen-relative), Shift scuttles, P toggles the autopilot tour, 1 toggles the post pass.
+Controls: WASD / arrows move (screen-relative), Shift scuttles, Space or click impales (front legs on the move, front four standing still), P toggles the autopilot tour, 1 toggles the post pass, R restarts after death.
 
-URL switches: `?auto` autopilot, `?cam=height,back` camera distance, `?at=x,z,heading` start position, `?nopost`.
+URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` no damage, `?nopeople` empty lab, `?eye=x,y,z&look=x,y,z&hide` debug camera, `?cam=height,back` camera distance, `?at=x,z,heading` start position, `?nopost`.
 
 ## How it works
 
@@ -31,6 +31,15 @@ URL switches: `?auto` autopilot, `?cam=height,back` camera distance, `?at=x,z,he
   - `world.js`: `buildWorld(scene, layout)` builds any layout and serves the queries: `heightAt` (a 10 cm
     height grid), `shotHit` (line of fire vs walls, columns and tall props, height-aware), `collide` (outer
     shell), `nav` (a 0.5 m walk grid for people), `roomAt`.
+- `src/people/`: everyone who isn't the spider. `types.js` is data (scientists: harmless, wander, flee once the
+  spider is within 22 m of walking distance or they hear shooting; soldiers in hazmat suits: close in, stop and
+  fire bursts when they have a clear line within 26 m, back off when it's within 7 m). `pathmaps.js` builds
+  Dijkstra maps on the world's walk grid (distance to the spider, and a flee map whose slopes lead round walls
+  and through doors). `bodies.js` draws them as instanced procedural figures (no faces), animated in code.
+  Bullets stop on concrete: `world.shotHit` is height-aware, so a wall hides the spider but the top of one doesn't.
+- `src/fx.js`: pooled tracers, muzzle flashes, sparks, ichor, blood and floor stains.
+- The impale (`spider.strike`): each free leg rises over the nearest person in reach, stabs down (hit-stop,
+  camera kick), carries them to the fangs and feeds (+8 health); then steps back down onto a foothold.
 - `src/textures.js`: every texture is painted in code at load (concrete, wall panels, rack LEDs, screens,
   the spider's legs and veined abdomen).
 - `src/post.js`: after Skyward's post pass: HDR scene, quarter/sixteenth-res Gaussian haze and bloom,

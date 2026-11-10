@@ -6,6 +6,9 @@ import { Spider } from './spider.js';
 import { Post, postParams } from './post.js';
 import { softDot } from './textures.js';
 import { damp, clamp } from './util.js';
+import { FX } from './fx.js';
+import { People } from './people/people.js';
+import { Hud } from './hud.js';
 
 // URL switches: ?auto (autopilot tour), ?shot (for tools/shot.mjs: no HUD, fixed time step),
 // ?cam=x,z (start the camera / spider somewhere), ?nopost
@@ -35,6 +38,12 @@ const lab = buildWorld(scene, makeLabLayout());
 const spider = new Spider(scene, lab);
 spider.place(lab.spawn.x, lab.spawn.z, lab.spawn.heading);
 if (Q.get('at')) { const [x, z, h] = Q.get('at').split(',').map(Number); spider.place(x, z, h || 0); }
+
+// the people (?nopeople: an empty lab), effects, the game's state
+const fx = new FX(scene);
+const people = Q.has('nopeople') ? null : new People(scene, lab, spider, fx);
+const state = { hp: 100, kills: 0, over: false, hurt: 0, log: [] };
+const hud = new Hud();
 
 // dust in the air, drifting through the lamp light
 const dust = (() => {
@@ -82,8 +91,13 @@ addEventListener('keydown', (e) => {
   keys.add(e.code);
   if (e.code === 'KeyP') auto = !auto;
   if (e.code === 'Digit1') postParams.on = !postParams.on;
+  if (e.code === 'KeyR' && state.over) location.reload();
+  if (e.code === 'Space') { e.preventDefault(); strike(); }
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
+addEventListener('mousedown', (e) => { if (e.button === 0) strike(); });
+// the attack: every free leg with someone in reach impales them (spider.strike)
+function strike() { if (people && !state.over) spider.strike(people); }
 addEventListener('blur', () => keys.clear());
 function readInput() {
   const k = (...c) => c.some((x) => keys.has(x));
@@ -115,18 +129,37 @@ function measureClip() {
 }
 
 // main loop (fixed 60 Hz steps when shooting, so captures are repeatable)
-let last = performance.now(), time = 0;
+let last = performance.now(), time = 0, hitStop = 0, autoT = 0;
 function frame(now) {
   const real = clamp((now - last) / 1000, 0, 1 / 20);
   last = now;
   const steps = SHOT ? 1 : 1;
-  const dt = SHOT ? 1 / 60 : real;
+  // hit-stop: a few frames of near-freeze on every impale, so it lands
+  let dt = SHOT ? 1 / 60 : real;
+  if (hitStop > 0) { hitStop -= dt; dt *= 0.06; }
   for (let i = 0; i < steps; i++) {
     time += dt;
     spider.update(dt, readInput());
     if (clip) measureClip();
     for (const e of spider.events) if (e.type === 'step') shake = Math.min(0.6, shake + 0.06);
+    if (people && Q.has('autoattack') && (autoT += dt) > 0.3) { autoT = 0; strike(); }
+    for (const e of spider.events) {
+      if (e.type === 'impale') { shake = Math.min(1, shake + 0.4); hitStop = 0.06; state.log.push(['impale', +time.toFixed(2)]); }
+      if (e.type === 'eat') { state.kills++; state.hp = Math.min(100, state.hp + 8); }
+    }
+    if (people) {
+      people.update(dt, time);
+      for (const e of people.events) {
+        if (e.type === 'shot' && e.hit && !state.over && !Q.has('god')) { state.hp -= e.damage; state.hurt = 1; shake = Math.min(0.8, shake + 0.08); }
+      }
+    }
+    fx.update(dt);
   }
+  // hurt: a red pulse in the post pass
+  state.hurt = Math.max(0, state.hurt - dt * 4);
+  post.flash.set(0.16 * state.hurt, 0.004 * state.hurt, 0);
+  if (state.hp <= 0 && !state.over) { state.over = true; hud.end('SPECIMEN TERMINATED'); }
+  hud.set(state.hp, state.kills);
   lab.update(time);
   dust.update(dt, time);
   updateCamera(dt, time);
@@ -137,4 +170,4 @@ updateCamera(1, 0);
 requestAnimationFrame(frame);
 
 // for tools and the console
-window.game = { spider, lab, camera, postParams, CAM, renderer, clip, get time() { return time; } };
+window.game = { spider, lab, people, fx, state, camera, postParams, CAM, renderer, clip, get time() { return time; } };

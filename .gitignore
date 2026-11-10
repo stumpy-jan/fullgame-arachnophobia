@@ -3,3 +3,4 @@ dist
 shots
 .DS_Store
 tools/_probe.mjs
+tools/_kills.mjs

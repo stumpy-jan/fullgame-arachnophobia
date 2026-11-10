@@ -41,6 +41,7 @@ export const spiderParams = {
   raiseFront: false, // sprinting: the front pair lifts and is held up and forward (runs on six); off: all eight run
 };
 
+const STRIKE_REACH = 5.8; // m from the hip
 const FEMUR = 2.6, TIBIA = 2.6, META = 1.3, META_TILT = 0.22, REACH = FEMUR + TIBIA;
 
 export class Spider {
@@ -362,6 +363,9 @@ export class Spider {
     // legs come in closer to the body the faster it goes (more stride before a foot is left behind)
     this.tuck = 1 - 0.2 * clamp((speed - P.walk * 0.5) / (P.sprint - P.walk * 0.5), 0, 1);
 
+    // --- striking legs: raise, stab, carry to the fangs (strikeUpdate)
+    for (const l of this.legs) if (l.strike) this.strikeUpdate(l, dt);
+
     // --- sprinting: the front pair comes up off the ground and is held raised and forward, swaying with
     // the run; it comes back down (a normal step onto a foothold) a moment after the sprint ends
     const sprinting = P.raiseFront && speed > P.walk + 1.5;
@@ -391,7 +395,7 @@ export class Spider {
     }
     // hovering legs drift smoothly to where they're held (not snap)
     for (const l of this.legs) {
-      if (!l.hover || l.raised || l.stepping) continue;
+      if (!l.hover || l.raised || l.stepping || l.strike) continue;
       l.foot.x = damp(l.foot.x, l.hoverGoal.x, 8, dt); l.foot.y = damp(l.foot.y, l.hoverGoal.y, 8, dt); l.foot.z = damp(l.foot.z, l.hoverGoal.z, 8, dt);
     }
     // in the air or not: how the metatarsus is carried
@@ -402,7 +406,7 @@ export class Spider {
     const stepAt = P.stepAt + speed * 0.1;
     const want = [];
     for (const l of this.legs) {
-      if (l.stepping || l.raised) continue;
+      if (l.stepping || l.raised || l.strike) continue;
       // drift from where it should be: the rest spot ahead by the velocity (cheap; the full foothold
       // search only runs when it actually steps)
       const [lx, lz] = this.leadOffset(P.lead), tk = this.tuck;
@@ -492,6 +496,72 @@ export class Spider {
       if (c < 0.05 && c > -9) return false;                          // (-9: out of reach mid-swing, fine)
     }
     return true;
+  }
+
+  // ---------------------------------------------------------------- the impale
+  // Strike with every free leg that has someone in reach: the front pair on the move, the front two pairs
+  // standing still (more legs to spare when it doesn't need them to walk). people: People (nearest,
+  // grab, consume). Returns how many legs struck.
+  strike(people) {
+    this.people = people;
+    const speed = Math.hypot(this.vel.x, this.vel.z);
+    const pairs = speed < 1 ? [0, 1] : [0];
+    const taken = new Set(this.legs.filter((l) => l.strike).map((l) => l.strike.h));
+    let n = 0;
+    for (const l of this.legs) {
+      if (!pairs.includes(l.k) || l.strike || this.time - (l.strikeEnd || -9) < 0.15) continue;
+      const hip = this.hipWorld(l, _H);
+      const side = l.s * Math.cos(this.heading), sideZ = -l.s * Math.sin(this.heading); // this leg's side of the body
+      const h = people.nearest(hip.x, hip.z, STRIKE_REACH, (o) => !taken.has(o)
+        && ((o.x - this.pos.x) * side + (o.z - this.pos.z) * sideZ > -1.2 || l.k === 0));
+      if (!h) continue;
+      taken.add(h);
+      l.strike = { h, t: 0, phase: 'raise', from: new THREE.Vector3() };
+      l.stepping = false; l.hover = true;
+      n++;
+    }
+    return n;
+  }
+
+  strikeUpdate(l, dt) {
+    const S = l.strike, h = S.h, P = this.people;
+    S.t += dt;
+    if (S.phase === 'raise') {
+      // up over the victim (tracking them), a beat to telegraph it
+      if (!P.alive(h)) { this.endStrike(l); return; }
+      const hip = this.hipWorld(l, _H);
+      _R.set(h.x + (hip.x - h.x) * 0.15, Math.max(h.y + 3.4, hip.y + 1.4), h.z + (hip.z - h.z) * 0.15);
+      l.foot.x = damp(l.foot.x, _R.x, 16, dt); l.foot.y = damp(l.foot.y, _R.y, 16, dt); l.foot.z = damp(l.foot.z, _R.z, 16, dt);
+      if (S.t > 0.22) { S.phase = 'stab'; S.t = 0; S.from.copy(l.foot); }
+    } else if (S.phase === 'stab') {
+      // down through them
+      _R.set(h.x, h.y + 1.35, h.z);
+      const e = Math.min(1, S.t / 0.07);
+      l.foot.lerpVectors(S.from, _R, e * e);
+      if (e >= 1) {
+        P.grab(h);
+        this.events.push({ type: 'impale', h, pos: l.foot.clone() });
+        S.phase = 'carry'; S.t = 0; S.from.copy(l.foot);
+      }
+    } else if (S.phase === 'carry' || S.phase === 'eat') {
+      // lift them, swing them in to the fangs, hold them there while it feeds
+      _R.set(0, -0.1, 1.5).applyMatrix4(this.root.matrixWorld);
+      const e = S.phase === 'eat' ? 1 : smooth(Math.min(1, S.t / 0.5));
+      l.foot.lerpVectors(S.from, _R, e);
+      l.foot.y += Math.sin(Math.PI * e) * 1.2;
+      h.x = l.foot.x; h.z = l.foot.z; h.y = l.foot.y - 1.35; h.tilt = 1.1 * e; h.heading += dt * 3;
+      if (S.phase === 'carry' && S.t >= 0.5) { S.phase = 'eat'; S.t = 0; }
+      else if (S.phase === 'eat' && S.t >= 0.4) {
+        P.consume(h);
+        this.events.push({ type: 'eat', h, pos: l.foot.clone() });
+        this.endStrike(l);
+      }
+    }
+  }
+
+  endStrike(l) {
+    l.strike = null; l.strikeEnd = this.time;
+    l.hover = true; l.hoverGoal.copy(l.foot); l.lastPlan = -1; // back down: the next re-plan steps it onto a foothold
   }
 
   pose(l) {

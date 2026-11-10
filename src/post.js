@@ -95,7 +95,7 @@ export class Post {
             vec3 haze = bicubic(tHaze, vUv), wide = bicubic(tWide, vUv);
             c = mix(c, mix(haze, wide, 0.4), uHaze);
             c += max(haze - uThreshold, 0.0) * uGlow * 0.7 + max(wide - uThreshold * 0.7, 0.0) * uGlow * 1.2;
-            c += uFlash;
+            c += uFlash * smoothstep(0.45, 1.0, length(d * vec2(1.25, 1.0)) * 1.4); // hurt: red at the edges only
             c *= 1.0 - uVignette * smoothstep(0.25, 0.95, length(d * vec2(1.25, 1.0)) * 1.3);
           } else c = texture2D(tScene, vUv).rgb;
           c = toneMapping(c);
