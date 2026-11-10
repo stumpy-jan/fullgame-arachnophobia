@@ -45,7 +45,7 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
     shirt: cloth(pick([0x6d8aa8, 0x8c8c86, 0x9a6b6b, 0x5c6b58]), 0.9), skin: c(pick(SKIN), 0.6),
     hair: c(pick(HAIR), 0.75), shoe: c(0x1a1716, 0.6),
   };
-  const visor = new THREE.MeshStandardMaterial({ color: 0x050608, roughness: 0.06, metalness: 0.6, emissive: dark ? 0xff9a2a : 0x000000, emissiveIntensity: dark ? 3 : 0 });
+  const visor = new THREE.MeshStandardMaterial({ color: 0x050608, roughness: 0.06, metalness: 0.6, emissive: 0xff9a2a, emissiveIntensity: dark ? 3 : 0.5 });
   const add = (geo, mat, parent, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; };
   const G = (parent, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
 
@@ -81,13 +81,14 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
     seg(A.up, 0.29, 0.052 * bulk, 0.044 * bulk, soldier ? M.suit : M.coat);
     seg(A.fore, 0.26, 0.046 * bulk, 0.036 * bulk, soldier ? M.suit : M.coat);
     if (!soldier) add(new THREE.CylinderGeometry(0.052, 0.046, 0.06, 10), M.coat, A.fore, 0, -0.23, 0); // cuff
-    const hand = add(new THREE.SphereGeometry(0.042, 10, 8), soldier ? M.glove : M.skin, A.hand, 0, -0.03, 0.005);
-    hand.scale.set(0.8, 1.15, 0.6);
+    const hm = soldier ? M.glove : M.skin;
+    add(new RoundedBoxGeometry(0.06, 0.1, 0.03, 2, 0.013), hm, A.hand, 0, -0.045, 0.004);
+    add(new THREE.CapsuleGeometry(0.012, 0.035, 3, 6), hm, A.hand, -0.032 * A.s, -0.03, 0.015).rotation.set(0.4, 0, 0.6 * A.s);
     if (soldier && A.s > 0) add(new THREE.CylinderGeometry(0.056, 0.056, 0.05, 10), M.band, A.up, 0, -0.06, 0); // orange shoulder band
   }
 
   // --- head and clothes
-  let coatTail = null, gun = null, flash = null;
+  let coatTail = null, gun = null, flash = null, laser = null, torch = null;
   if (soldier) {
     const hood = add(new THREE.SphereGeometry(0.13, 18, 14), M.hood, head, 0, 0.02, -0.01);
     hood.scale.set(0.98, 1.08, 1.04);
@@ -107,6 +108,10 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
     add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 8), M.gun, gun, 0, 0.02, 0.4).rotation.x = Math.PI / 2;
     flash = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 6, 2.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     flash.position.set(0, 0.02, 0.6); flash.visible = false; gun.add(flash);
+    laser = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.008, 16).translate(0, 0, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.25, 0.12), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    laser.position.set(0, 0.04, 0.55); gun.add(laser);
+    torch = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: coneTexture(), color: new THREE.Color(1.15, 1.0, 0.72), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    torch.rotation.y = Math.PI; torch.position.set(0, 0.012, 3.4); torch.scale.set(3.2, 1, 5.6); root.add(torch);
   } else {
     const skull = add(new THREE.SphereGeometry(0.1, 16, 12), M.skin, head, 0, 0.05, 0);
     skull.scale.set(0.9, 1.08, 1.0);
@@ -131,7 +136,7 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
   const st = { tail: 0, tailV: 0, look: 0, lookT: R() * 3 };
   return {
     group: root,
-    update(t, dt, { phase, stride = 0, aim = 0, lean = 0, panic = 0, fireT = 9 }) {
+    update(t, dt, { phase, stride = 0, aim = 0, lean = 0, panic = 0, fireT = 9, flail = 0, fall = 0, idle = null }) {
       const s = Math.sin(phase), cph = Math.cos(phase), k = stride;
       // hips: bob at each footfall, twist with the stride; the chest counter-twists
       hips.position.y = 0.93 - (0.045 - Math.abs(cph) * 0.045) * k - 0.04 * aim;
@@ -166,6 +171,31 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
       const want = panic > 0 && st.lookT < 0.6 ? (seed % 2 ? 1 : -1) * 1.3 * panic : 0;
       st.look += (want - st.look) * Math.min(1, dt * 10);
       neck.rotation.y = st.look * 0.6; head.rotation.y = st.look * 0.5; spine.rotation.y += st.look * 0.25;
+      // idle: typing at a bench (forearms forward, hands busy) or looking round
+      if (idle === 'type' && !stride) {
+        for (const A of arms) { A.up.rotation.set(-0.55, 0, A.s * 0.15); A.fore.rotation.x = -1.0 + Math.sin(t * 17 + A.s * 2) * 0.06; A.hand.rotation.x = 0.4; }
+        spine.rotation.x = 0.18; neck.rotation.x = 0.25;
+      } else if (idle === 'look' && !stride) {
+        neck.rotation.y = Math.sin(t * 0.9) * 0.7; head.rotation.x = Math.sin(t * 0.6) * 0.15;
+        for (const A of arms) { A.up.rotation.set(0.05, 0, A.s * 0.1); A.fore.rotation.x = -0.25; }
+      }
+      // flail: held in the air, arms thrashing over the head, legs kicking
+      if (flail > 0) {
+        for (const A of arms) { A.up.rotation.set(-2.5 + Math.sin(t * 13 + A.s) * 0.5, 0, A.s * (0.5 + Math.sin(t * 9 + A.s) * 0.3)); A.fore.rotation.x = -0.5 + Math.sin(t * 15 + A.s * 2) * 0.6; }
+        for (const L of legs) { L.thigh.rotation.set(Math.sin(t * 11 + L.s * 1.7) * 0.7 - 0.3, 0, L.s * 0.15); L.shin.rotation.x = 0.6 + Math.sin(t * 12 + L.s) * 0.5; }
+        spine.rotation.set(-0.25 + Math.sin(t * 7) * 0.15, Math.sin(t * 5) * 0.3, Math.sin(t * 6) * 0.2);
+        neck.rotation.x = -0.4;
+      }
+      // fall: pitch forward over the feet, arms out, then lie still
+      body.rotation.x = fall * Math.PI * 0.48;
+      body.position.y = fall * 0.16;
+      if (fall > 0) {
+        for (const A of arms) { A.up.rotation.set(-1.4 * fall + (A.up.rotation.x) * (1 - fall), 0, A.s * 0.9 * fall); A.fore.rotation.x *= 1 - fall; }
+        for (const L of legs) { L.thigh.rotation.x *= 1 - fall; L.shin.rotation.x = L.shin.rotation.x * (1 - fall) + 0.15 * fall; L.thigh.rotation.z = L.s * 0.12 * fall; }
+        neck.rotation.x = -0.6 * fall;
+      }
+      if (torch) { torch.visible = fall < 0.5 && flail === 0; }
+      if (laser) laser.visible = aim > 0.6 && fall === 0;
       // rifle: carried low, or shouldered; recoil kicks it and the shoulder back
       if (gun) {
         const kick = fireT < 0.08 ? 1 - fireT / 0.08 : 0;
@@ -177,4 +207,14 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
       }
     },
   };
+}
+
+let _cone = null;
+function coneTexture() {
+  if (_cone) return _cone;
+  const [c, g] = makeCanvas(128, 128);
+  const gr = g.createRadialGradient(64, 128, 4, 64, 128, 128);
+  gr.addColorStop(0, 'rgba(255,255,255,0.85)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.22)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(64, 128); g.lineTo(0, 0); g.lineTo(128, 0); g.closePath(); g.fill();
+  return (_cone = canvasTexture(c, { repeat: false }));
 }
