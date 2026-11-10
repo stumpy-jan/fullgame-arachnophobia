@@ -37,6 +37,8 @@ export const spiderParams = {
   stepAt: 1.2,       // m a foot may drift before it steps (grows with speed)
   stepTime: 0.28,    // s per step at a walk (shorter when fast)
   legMargin: 0.18,   // m every part of a leg must keep from the world
+  maxLead: 1.6,      // m: how far ahead of its rest spot a foot may be placed, however fast (stays in reach)
+  raiseFront: true,  // sprinting: the front pair lifts and is held up and forward (runs on six)
 };
 
 const FEMUR = 2.6, TIBIA = 2.6, META = 1.3, META_TILT = 0.22, REACH = FEMUR + TIBIA;
@@ -46,6 +48,7 @@ export class Spider {
     this.world = world;
     this.pos = new THREE.Vector3();      // ground position (x, z); y = body height
     this.vel = new THREE.Vector3();
+    this.tuck = 1;
     this.heading = 0;
     this.pitch = 0; this.roll = 0;
     this.bob = 0; this.bobV = 0;
@@ -128,6 +131,7 @@ export class Spider {
           rest: new THREE.Vector3(s * Math.sin(angles[k]) * reach[k], 0, Math.cos(angles[k]) * reach[k]),
           foot: new THREE.Vector3(), from: new THREE.Vector3(), target: new THREE.Vector3(),
           stepping: false, hover: false, willHover: false, t: 0, dur: 0.25, apex: 0, over: false, lastStep: 0, lastPlan: 0,
+          raised: false, air: 0, hoverGoal: new THREE.Vector3(), fv: new THREE.Vector3(),
           jit: 0.9 + R() * 0.2,                 // a little per-leg irregularity in timing
           j: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], // hip, knee, ankle (world)
         };
@@ -155,20 +159,27 @@ export class Spider {
   // the joints for a hip and a foot: the metatarsus leans in from the foot towards the hip by META_TILT;
   // the knee is two-bone IK between hip and ankle, bent up (and a little out). Returns the true
   // hip-to-ankle distance (> REACH means over-stretched).
-  solve(hip, foot, knee, ankle) {
+  // air (0..1): a leg in the air carries its metatarsus on out from the hip instead of hanging it down
+  solve(hip, foot, knee, ankle, air = 0) {
     let dx = foot.x - hip.x, dz = foot.z - hip.z;
     const hd = Math.hypot(dx, dz) || 1;
     dx /= hd; dz /= hd;
     const st = Math.sin(META_TILT) * META;
     ankle.set(foot.x - dx * st, foot.y + Math.cos(META_TILT) * META, foot.z - dz * st);
+    if (air > 0) {
+      const fx = foot.x - hip.x, fy = foot.y - hip.y, fz = foot.z - hip.z, fl = Math.hypot(fx, fy, fz) || 1;
+      const ax_ = foot.x - (fx / fl) * META * 0.95, ay_ = foot.y - (fy / fl) * META * 0.95 + 0.35, az_ = foot.z - (fz / fl) * META * 0.95;
+      ankle.set(ankle.x + (ax_ - ankle.x) * air, ankle.y + (ay_ - ankle.y) * air, ankle.z + (az_ - ankle.z) * air);
+    }
     const ax = ankle.x - hip.x, ay = ankle.y - hip.y, az = ankle.z - hip.z;
     const reach = Math.hypot(ax, ay, az) || 1e-4;
     const ux = ax / reach, uy = ay / reach, uz = az / reach;
     const d = clamp(reach, Math.abs(FEMUR - TIBIA) + 0.05, REACH - 0.01);
     const x = (FEMUR * FEMUR - TIBIA * TIBIA + d * d) / (2 * d);
     const h = Math.sqrt(Math.max(0, FEMUR * FEMUR - x * x));
-    // pole: up, a little outward, made perpendicular to the hip->ankle line
-    let px = dx * 0.3, py = 1, pz = dz * 0.3;
+    // pole: up and a little outward, made perpendicular to the hip->ankle line
+    // (in the air the knee bends outward: "up" flips across when the leg itself points up)
+    let px = dx * (0.3 + air * 1.5), py = 1 - air * 0.5, pz = dz * (0.3 + air * 1.5);
     const pd = px * ux + py * uy + pz * uz;
     px -= ux * pd; py -= uy * pd; pz -= uz * pd;
     const pl = Math.hypot(px, py, pz) || 1;
@@ -177,8 +188,8 @@ export class Spider {
   }
 
   // how far the whole leg stays clear of the world (m; negative = it clips), or -9 if out of reach
-  clearance(hip, foot) {
-    const r = this.solve(hip, foot, _K, _A);
+  clearance(hip, foot, air = 0) {
+    const r = this.solve(hip, foot, _K, _A, air);
     if (r > REACH - 0.02 || r < 1.2) return -9;
     const H = this.world.heightAt;
     let c = 99;
@@ -199,9 +210,9 @@ export class Spider {
     const H = this.world.heightAt, P = spiderParams;
     const hip = this.hipWorld(l, _H, l.dur * 0.6);
     const c = Math.cos(this.heading), s = Math.sin(this.heading);
-    const lead = P.lead + l.dur * 0.5;
-    const nx = this.pos.x + l.rest.x * c + l.rest.z * s + this.vel.x * lead;
-    const nz = this.pos.z - l.rest.x * s + l.rest.z * c + this.vel.z * lead;
+    const [lx, lz] = this.leadOffset(P.lead + l.dur * 0.5), tk = this.tuck;
+    const nx = this.pos.x + (l.rest.x * c + l.rest.z * s) * tk + lx;
+    const nz = this.pos.z + (-l.rest.x * s + l.rest.z * c) * tk + lz;
     const ny = H(nx, nz);
     const cands = [[nx, nz]];
     // march from the hip out towards (and past) the nominal spot: the floor before each face, each top
@@ -250,6 +261,13 @@ export class Spider {
     for (let d = 1; d < L + 1; d += 0.3) top = Math.max(top, H(hip.x + ux * d, hip.z + uz * d));
     out.set(nx - ux * 0.8, Math.min(top + 0.9, hip.y + 1.0), nz - uz * 0.8);
     return false;
+  }
+
+  // velocity * t, but no longer than maxLead: at a sprint the feet can't be planted further ahead
+  // than the legs reach (that's what made the front legs flicker between stepping and hovering)
+  leadOffset(t) {
+    const ox = this.vel.x * t, oz = this.vel.z * t, len = Math.hypot(ox, oz), k = len > spiderParams.maxLead ? spiderParams.maxLead / len : 1;
+    return [ox * k, oz * k];
   }
 
   place(x, z, heading) {
@@ -341,36 +359,76 @@ export class Spider {
     this.root.rotation.set(-this.pitch, this.heading, this.roll);
     this.root.updateMatrixWorld();
 
+    // legs come in closer to the body the faster it goes (more stride before a foot is left behind)
+    this.tuck = 1 - 0.2 * clamp((speed - P.walk * 0.5) / (P.sprint - P.walk * 0.5), 0, 1);
+
+    // --- sprinting: the front pair comes up off the ground and is held raised and forward, swaying with
+    // the run; it comes back down (a normal step onto a foothold) a moment after the sprint ends
+    const sprinting = P.raiseFront && speed > P.walk + 1.5;
+    this.sprintT = sprinting ? (this.sprintT || 0) + dt : 0;
+    this.calmT = sprinting ? 0 : (this.calmT || 0) + dt;
+    for (const l of this.legs) {
+      if (l.k !== 0) continue;
+      if (!l.raised && this.sprintT > 0.2 && !l.stepping) {
+        l.raised = true; l.hover = true;
+        l.fv.set(0, 0, 0);
+      }
+      if (l.raised && this.calmT > 0.25) { l.raised = false; l.lastPlan = -1; l.hoverGoal.copy(l.foot); }
+      if (l.raised) {
+        const sw = Math.sin(this.time * 7 + (l.s > 0 ? 0 : Math.PI));
+        _R.set(l.s * (2.7 + sw * 0.2), 1.7 + sw * 0.3, 2.7 + Math.cos(this.time * 7 + l.s) * 0.25); // a wide V, up and forward
+        this.root.localToWorld(_R);
+        // held clear of whatever it's running past: lift it until the whole leg clears
+        const hip = this.hipWorld(l, _H);
+        for (let i = 0; i < 6 && this.clearance(hip, _R, 1) < 0.25; i++) _R.y += 0.5;
+        // a critically damped spring: no jumps, however the body moves
+        const k = 160, d = 2 * Math.sqrt(k);
+        l.fv.x += ((_R.x - l.foot.x) * k - l.fv.x * d) * dt; l.fv.y += ((_R.y - l.foot.y) * k - l.fv.y * d) * dt; l.fv.z += ((_R.z - l.foot.z) * k - l.fv.z * d) * dt;
+        l.foot.addScaledVector(l.fv, dt);
+        // and where it actually is (the spring lags at a sprint): never let it trail into anything
+        for (let i = 0; i < 6 && this.clearance(hip, l.foot, l.air) < 0.1; i++) { l.foot.y += 0.3; l.fv.y = Math.max(l.fv.y, 0); }
+      }
+    }
+    // hovering legs drift smoothly to where they're held (not snap)
+    for (const l of this.legs) {
+      if (!l.hover || l.raised || l.stepping) continue;
+      l.foot.x = damp(l.foot.x, l.hoverGoal.x, 8, dt); l.foot.y = damp(l.foot.y, l.hoverGoal.y, 8, dt); l.foot.z = damp(l.foot.z, l.hoverGoal.z, 8, dt);
+    }
+    // in the air or not: how the metatarsus is carried
+    for (const l of this.legs) l.air = damp(l.air, l.hover && !l.stepping ? 1 : l.stepping ? 0.35 : 0, 8, dt);
+
     // --- legs: who needs to step
     const fast = clamp(speed / P.sprint, 0, 1);
     const stepAt = P.stepAt + speed * 0.1;
     const want = [];
     for (const l of this.legs) {
-      if (l.stepping) continue;
+      if (l.stepping || l.raised) continue;
       // drift from where it should be: the rest spot ahead by the velocity (cheap; the full foothold
       // search only runs when it actually steps)
-      const nx = this.pos.x + l.rest.x * c + l.rest.z * s + this.vel.x * P.lead;
-      const nz = this.pos.z - l.rest.x * s + l.rest.z * c + this.vel.z * P.lead;
+      const [lx, lz] = this.leadOffset(P.lead), tk = this.tuck;
+      const nx = this.pos.x + (l.rest.x * c + l.rest.z * s) * tk + lx;
+      const nz = this.pos.z + (-l.rest.x * s + l.rest.z * c) * tk + lz;
       const drift = Math.hypot(nx - l.foot.x, nz - l.foot.z);
       // about to clip or over-stretch: checked a moment ahead, so it lifts before it happens
-      const invalid = !l.hover && this.clearance(this.hipWorld(l, _H, 0.15), l.foot) < 0.08;
+      const invalid = !l.hover && this.clearance(this.hipWorld(l, _H, Math.min(0.15, 0.6 / Math.max(speed, 0.1))), l.foot) < 0.08;
       const idle = speed < 0.3 && drift > 0.35 && this.time - l.lastStep > 0.5 * l.jit;
-      const replan = l.hover && this.time - l.lastPlan > 0.15;        // a hovering leg keeps looking
+      const replan = l.hover && this.time - l.lastPlan > 0.3;         // a hovering leg keeps looking (not too eagerly)
       if (invalid || drift > stepAt * l.jit || idle || replan) {
-        want.push({ l, urgent: invalid || drift > stepAt * 2.2, score: (invalid ? 100 : 0) + drift });
+        want.push({ l, urgent: invalid || drift > stepAt * 2.2, score: (invalid ? 100 : 0) + drift, why: invalid ? 'invalid' : replan ? 'replan' : idle ? 'idle' : 'drift' });
       }
     }
     want.sort((a, b) => b.score - a.score);
     let swinging = 0;
     for (const l of this.legs) if (l.stepping) swinging++;
-    for (const { l, urgent } of want) {
+    for (const { l, urgent, why } of want) {
       if (swinging >= 4 && !urgent) continue;
       if (!urgent && l.neighbours.some((o) => o.stepping)) continue;
       l.dur = P.stepTime * (1 - fast * 0.4) * l.jit;
       l.lastPlan = this.time;
       const ok = this.foothold(l, l.target);
-      if (l.hover && !ok) { l.foot.lerp(l.target, 0.25); continue; }  // still nowhere to stand: keep hovering
+      if (l.hover && !ok) { l.hoverGoal.copy(l.target); continue; }    // still nowhere to stand: keep hovering
       l.stepping = true; l.t = 0;
+      if (this.log) this.log.push([+this.time.toFixed(2), l.k, l.s, why, ok ? 1 : 0, +Math.hypot(l.target.x - l.foot.x, l.target.z - l.foot.z).toFixed(2)]);
       l.from.copy(l.foot);
       l.willHover = !ok;
       // the swing: up, across and down when something between is higher than both ends
@@ -379,7 +437,7 @@ export class Spider {
       l.over = top > Math.max(l.from.y, l.target.y) + 0.15;
       l.apex = top + (l.over ? 0.55 : 0.4 + Math.hypot(l.target.x - l.from.x, l.target.z - l.from.z) * 0.1);
       // check the whole leg along the swing (where the hip will be by then); raise the arc until it clears
-      for (let tries = 0; tries < 4 && !this.swingClear(l); tries++) { l.over = true; l.apex += 0.5; }
+      for (let tries = 0; tries < 6 && !this.swingClear(l); tries++) { l.over = true; l.apex += 0.45; }
       swinging++;
     }
 
@@ -393,6 +451,7 @@ export class Spider {
         l.stepping = false; l.lastStep = this.time;
         l.foot.copy(l.target);
         l.hover = l.willHover;
+        l.hoverGoal.copy(l.foot);
         if (!l.hover) {
           this.bobV -= 0.3 + fast * 0.4;
           this.events.push({ type: 'step', pos: l.foot.clone(), k: l.k });
@@ -428,7 +487,7 @@ export class Spider {
   }
 
   swingClear(l) {
-    for (const t of [0.25, 0.5, 0.75]) {
+    for (const t of [0.15, 0.3, 0.45, 0.6, 0.75, 0.9]) {
       const c = this.clearance(this.hipWorld(l, _H2, l.dur * t), this.swingAt(l, t, _S));
       if (c < 0.05 && c > -9) return false;                          // (-9: out of reach mid-swing, fine)
     }
@@ -438,7 +497,7 @@ export class Spider {
   pose(l) {
     const [hip, knee, ankle] = l.j;
     this.hipWorld(l, hip);
-    this.solve(hip, l.foot, knee, ankle);
+    this.solve(hip, l.foot, knee, ankle, l.air);
     seg(l.femur, hip, knee);
     seg(l.tibia, knee, ankle);
     seg(l.meta, ankle, l.foot);
@@ -474,7 +533,7 @@ export class Spider {
   }
 }
 
-const _H = new THREE.Vector3(), _H2 = new THREE.Vector3(), _S = new THREE.Vector3(), _F = new THREE.Vector3(), _K = new THREE.Vector3(), _A = new THREE.Vector3();
+const _R = new THREE.Vector3(), _H = new THREE.Vector3(), _H2 = new THREE.Vector3(), _S = new THREE.Vector3(), _F = new THREE.Vector3(), _K = new THREE.Vector3(), _A = new THREE.Vector3();
 const EDGE = [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]];
 const FOOTPRINT = [[0, 0], [0.65, 0], [-0.65, 0], [0, 1.1], [0, -0.8], [0, -1.6], [0, -2.3]];
 const smooth = (t) => t * t * (3 - 2 * t);
