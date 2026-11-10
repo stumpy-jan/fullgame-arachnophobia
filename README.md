@@ -21,6 +21,8 @@ URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` 
   the leg hovers and the others carry the body. Planted legs are re-checked a moment ahead and step before they
   would clip; swings go up-across-down over obstacles and are checked mid-swing. Body height: above what's
   under it (with look-ahead) and the crests its legs reach over, below what planted legs can reach.
+  The face: the upper half of a head scan (CREDITS.md), cut out, flattened, softened, its shut eyelids
+  hollowed into sockets, set into the front of the carapace as a mask of its own chitin with two eyes.
 - `src/world/`: the level, split so a procedural generator only has to produce data:
   - `layout.js`: a layout is plain data (bounds, typed rooms, wall centre lines, pieces `{ type, ...params }`,
     who spawns where, the spider's start). `makeLabLayout()` is the hand-made first lab.

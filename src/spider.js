@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clamp, damp, angleTo, rng } from './util.js';
 import { legTextures, chitinTextures } from './textures.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // The specimen: a giant spider, animated entirely in code.
 //
@@ -42,6 +43,9 @@ export const spiderParams = {
 };
 
 const STRIKE_REACH = 5.8; // m from the hip
+// the face mask: placement on the body (pos, tilt up), size (scan units -> m), eye sockets (scan units,
+// after maskFromHead's recentring) and eye radius (scan units)
+const MASK = { pos: [0, 0.2, 0.92], tilt: -0.9, scale: 1.25 / 6.4, eye: [0.484, -0.09, 1.56], eyeR: 0.23 };
 const FEMUR = 2.6, TIBIA = 2.6, META = 1.3, META_TILT = 0.22, REACH = FEMUR + TIBIA;
 
 export class Spider {
@@ -89,12 +93,13 @@ export class Spider {
     const lump = (amp, freq, seed) => lumpy(new THREE.SphereGeometry(1, 64, 48), amp, freq, seed);
 
     // cephalothorax (forward is +z): lean and low
-    this.thorax = add(this.root, lump(0.05, 4, 1), chitin, 0, 0, 0.25, 0.72, 0.4, 0.88);
+    this.thorax = add(this.root, lump(0.05, 4, 1), chitin, 0, 0, 0.18, 0.72, 0.4, 0.8); // (its front pulled back: the mask is the front of the head)
     add(this.root, lump(0.06, 5, 2), chitin, 0, 0.22, 0.32, 0.44, 0.24, 0.6); // the raised carapace hump
-    // eyes: two big, six small, in a cluster at the front of the carapace
-    const eyes = [[0.09, 0.27, 1.08, 0.075], [-0.09, 0.27, 1.08, 0.075], [0.24, 0.24, 0.99, 0.042], [-0.24, 0.24, 0.99, 0.042],
-      [0.06, 0.37, 0.97, 0.038], [-0.06, 0.37, 0.97, 0.038], [0.18, 0.34, 0.87, 0.03], [-0.18, 0.34, 0.87, 0.03]];
-    for (const [x, y, z, r] of eyes) add(this.root, sphere, eyeMat, x, y, z, r, r, r).castShadow = false;
+    // the face: a mask grown out of its own chitin over the front of the carapace (loadMask), two eyes in it
+    this.maskMat = satin(chitinTextures(73, [92, 74, 64]), { normalScale: new THREE.Vector2(0.35, 0.35) }); // smoother: carved, not hairy
+    this.eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x030102, emissive: 0xff1806, emissiveIntensity: 0.22, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02 });
+    this.eyeGeo = sphere;
+    this.loadMask();
     // chelicerae and fangs
     this.fangs = [];
     for (const s of [-1, 1]) {
@@ -147,6 +152,34 @@ export class Spider {
     for (const l of this.legs) {
       l.neighbours = this.legs.filter((o) => o !== l && ((o.s === l.s && Math.abs(o.k - l.k) === 1) || (o.s !== l.s && o.k === l.k)));
     }
+  }
+
+  // ---------------------------------------------------------------- the face
+  // The upper half of a human face (a head scan, see CREDITS.md), cut out, softened and set into the front
+  // of the carapace, tilted up towards the camera: the creature's own chitin in the shape of a face, two
+  // glossy eyes in its sockets, the chelicerae and fangs hanging below it.
+  loadMask() {
+    new GLTFLoader().load('./models/LeePerrySmith.glb', (gltf) => {
+      let src = null;
+      gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o.geometry; });
+      if (!src) return;
+      const geo = maskFromHead(src);
+      const mesh = new THREE.Mesh(geo, this.maskMat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.scale.setScalar(MASK.scale);
+      const g = new THREE.Group();
+      g.position.set(...MASK.pos);
+      g.rotation.x = MASK.tilt;
+      g.add(mesh);
+      for (const s of [-1, 1]) {
+        const e = new THREE.Mesh(this.eyeGeo, this.eyeMat);
+        e.position.set(s * MASK.eye[0], MASK.eye[1], MASK.eye[2]);
+        e.scale.set(MASK.eyeR, MASK.eyeR * 0.8, MASK.eyeR * 0.7);
+        mesh.add(e);
+      }
+      this.root.add(g);
+      this.mask = g;
+    });
   }
 
   // ---------------------------------------------------------------- geometry of a leg
@@ -649,4 +682,36 @@ function spiny(geo, len, radius, n, R) {
   }
   parts[0] = parts[0].toNonIndexed();
   return mergeGeometries(parts);
+}
+
+// Cut the mask out of the head scan (faces +z, up +y; nose tip near (0, 1.1, 2.6)): the triangles of the
+// upper front of the face, from below the nose to the brow. Narrowed a little, the nose pressed back,
+// recentred so the origin sits between the eyes at the back of the mask.
+export function maskFromHead(src) {
+  const pos = src.attributes.position.clone(), uv = src.attributes.uv && src.attributes.uv.clone();
+  const keep = (i) => {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    return y > 0.92 && y < 3.5 && z > 0.6 && Math.abs(x) < 2.4;
+  };
+  const idx = src.index.array, out = [];
+  for (let t = 0; t < idx.length; t += 3) if (keep(idx[t]) && keep(idx[t + 1]) && keep(idx[t + 2])) out.push(idx[t], idx[t + 1], idx[t + 2]);
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    x *= 0.88;                                                   // narrower
+    z = z * 0.6 + 0.9;                                           // flatter: the cheeks and brow come forward (a mask, not a head)
+    const nose = Math.max(0, 1 - Math.abs(x) / 1.0) * Math.max(0, (z - 1.9) / 0.6) * Math.max(0, 1 - Math.max(0, y - 2.2) / 0.8);
+    z -= nose * 0.15;                                            // a softer, smaller nose
+    // the closed eyelids hollowed into sockets (the scan's eyes are shut; ours aren't)
+    for (const ex of [-0.55 * 0.88, 0.55 * 0.88]) {
+      const r = Math.hypot(x - ex, (y - 1.66) * 1.25);
+      if (r < 0.45) z -= 0.32 * (1 - (r / 0.45) ** 2);
+    }
+    pos.setXYZ(i, x, y - 1.75, z - 0.15);                         // origin between the eyes, at the back
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', pos);
+  if (uv) geo.setAttribute('uv', uv);
+  geo.setIndex(out);
+  geo.computeVertexNormals();
+  return geo;
 }
