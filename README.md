@@ -55,7 +55,13 @@ URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` 
   gib (`updateGibs`: bounces, bleeds, settles lying flat).
 - `src/damage.js`: battle damage that stays: bullet holes (placed by marching the shot through the height field onto
   the real surface), casings, glass shards, scorch; all instanced ring buffers.
-- `src/fx.js`: pooled tracers, muzzle flashes, sparks, ichor, blood and floor stains.
+- The run's frame: `index.html` is black (a veil) from the first paint; `main.js` builds the level, compiles every
+  shader (`compileAsync`) and draws behind it, then lifts it onto the title (the bay, slowly circled). `menu.js`: title,
+  pause (Esc), settings, the end of a run with its summary. `settings.js`: volumes, post, shadows, resolution, shake,
+  kept in the browser. `hud.js`: health, kills, locks; the slots as icons (`icons.js`) with keys, cooldown sweeps and
+  tooltips; a prompt only when there's something to do (F to feed). `?play` skips the title.
+- `src/fx.js`: soft particles sized in metres (sparks, dust, chips, smoke, blood, mist, fire, the spider's pink),
+  rounds as streaks with smoke trails, swipe arcs, shockwave rings; drops that land go into the spill. Formerly: pooled tracers, muzzle flashes, sparks, ichor, blood and floor stains.
 - The impale (`spider.strike`): each free leg rises over the nearest person in reach, stabs down (hit-stop,
   camera kick), carries them to the fangs and feeds (+8 health); then steps back down onto a foothold.
 - `src/textures.js`: every texture is painted in code at load (concrete, wall panels, rack LEDs, screens,

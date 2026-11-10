@@ -185,7 +185,7 @@ export function buildWorld(scene, layout) {
   }
 
   return {
-    root, layout, bounds: B, rooms: layout.rooms, breakables: ctx.breakables, locks: ctx.locks, door: ctx.door, clearHeight, heightAt, collide, shotHit, nav, roomAt, update,
+    lights: spots, root, layout, bounds: B, rooms: layout.rooms, breakables: ctx.breakables, locks: ctx.locks, door: ctx.door, clearHeight, heightAt, collide, shotHit, nav, roomAt, update,
     route: layout.route.map(([x, z]) => new THREE.Vector2(x, z)),
     spawn: layout.spawn,
   };

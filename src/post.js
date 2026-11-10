@@ -103,7 +103,10 @@ export class Post {
           if (uOn > 0.5) {
             float L = clamp((gLum(c) - 0.5) * uGradContrast + 0.5, 0.0, 1.0);
             vec3 gm = mix(uGradA, uGradB, smoothstep(uGradPos.x, uGradPos.y, L));
-            c = mix(c, gColor(clamp(c, 0.0, 1.0), gm), uGradStrength);
+            // (strong reds are left out of the grade: blood stays blood, not teal-grey)
+            float red = clamp((c.r - max(c.g, c.b)) * 5.0, 0.0, 1.0);
+            c = mix(c, gColor(clamp(c, 0.0, 1.0), gm), uGradStrength * (1.0 - 0.85 * red));
+            c = mix(c, c * vec3(1.12, 0.92, 0.92), red * 0.6);
             c += (hash(uvec3(gl_FragCoord.xy, uint(uTime * 24.0))) - 0.5) * uNoise * (1.2 - gLum(c));
           }
           vec2 dp = gl_FragCoord.xy + float(uint(uTime * 60.0) % 64u) * vec2(7.0, 13.0);

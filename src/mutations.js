@@ -135,13 +135,14 @@ class Quills {
   constructor(scene, fx) {
     this.fx = fx;
     this.list = [];
-    this.mesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.04, 0.7, 5).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a1c18, roughness: 0.5 }), 64);
+    this.mesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.07, 1.1, 6).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.35, emissive: 0x6a3020, emissiveIntensity: 0.8 }), 64);
     this.mesh.count = 0; this.mesh.frustumCulled = false; this.mesh.castShadow = true;
     scene.add(this.mesh);
   }
   fire(from, h) {
     const v = new THREE.Vector3(h.x - from.x, 1.2 - from.y + 2.5, h.z - from.z).normalize().multiplyScalar(26); // up and out first
     this.list.push({ p: from.clone(), v, h, life: 1.6 });
+    this.fx.burst(from, 'trail', 4, null, 0.6); this.fx.burst(from, 'spark', 3, v.clone().normalize(), 0.4);
   }
   update(dt, ctx) {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), Z = new THREE.Vector3(0, 0, 1);
@@ -153,11 +154,12 @@ class Quills {
       s.v.lerp(want, Math.min(1, dt * 7)); // homing
       const next = _F.copy(s.p).addScaledVector(s.v, dt);
       if (ctx.world.shotHit(s.p, next) >= 0 || ctx.world.heightAt(next.x, next.z) > next.y) { // into concrete
-        this.fx.burst(next, 'spark', 4); s.life = 0;
+        this.fx.impact(next, _D.copy(s.v).normalize().negate()); s.life = 0;
       } else if (ctx.people.alive(s.h) && next.distanceTo(_G.set(s.h.x, s.h.y + 1.2, s.h.z)) < 0.7) {
         ctx.people.hit(s.h, 1.5, s.v); s.life = 0;
       }
       s.p.copy(next);
+      if (s.life > 0) { this.fx.dot(s.p, 'trail', null); this.fx.dot(s.p, 'spark', null); } // the trail it leaves
       if (s.life > 0 && n < 64) { q.setFromUnitVectors(Z, _D.copy(s.v).normalize()); m.compose(s.p, q, _S.set(1, 1, 1)); this.mesh.setMatrixAt(n++, m); }
     }
     this.list = this.list.filter((s) => s.life > 0);

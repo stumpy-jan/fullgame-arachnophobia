@@ -15,7 +15,9 @@ import { Damage } from './damage.js';
 import { People } from './people/people.js';
 import { GEAR_MODELS } from './people/sculpted.js';
 import { Hud } from './hud.js';
-import { sfx, falloff, audioOpts } from './audio.js';
+import { sfx, falloff, audioOpts, startAudio, setVolumes } from './audio.js';
+import { Menu } from './menu.js';
+import { loadSettings, saveSettings } from './settings.js';
 import { Mutations, MUTATIONS, SLOTS, SLOT_NAMES, SLOT_KEYS } from './mutations.js';
 
 // URL switches: ?auto (autopilot tour), ?shot (for tools/shot.mjs: no HUD, fixed time step),
@@ -90,6 +92,7 @@ const dust = (() => {
 
 // camera: high and steep, a little behind (south of) the spider, leading where it's going
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.5, 200);
+fx.camera = camera; // (particle sizes are in metres)
 const CAM = { height: 34, back: 17 };
 if (Q.get('cam')) { const [h, b] = Q.get('cam').split(',').map(Number); CAM.height = h; CAM.back = b; }
 const camTarget = new THREE.Vector3().copy(spider.pos);
@@ -98,6 +101,12 @@ let shake = 0;
 const EYE = Q.get('eye') && Q.get('eye').split(',').map(Number), LOOK = Q.get('look') ? Q.get('look').split(',').map(Number) : [0, 0, 0];
 if (Q.has('hide')) spider.root.parent.traverse((o) => { if (o.isMesh && (o.parent === spider.root || spider.root.children.includes(o.parent) || o.material?.map === spider.legs[0].femur.material.map)) o.visible = false; });
 function updateCamera(dt, t) {
+  if (mode === 'title' && !EYE) { // the title: a slow drift round the bay, the specimen in the wreck of its tank
+    const a = 0.6 + t * 0.04;
+    camera.position.set(spider.pos.x + Math.sin(a) * 15, 11, spider.pos.z + Math.cos(a) * 15);
+    camera.lookAt(spider.pos.x - Math.cos(a) * 3, 1.2, spider.pos.z + Math.sin(a) * 3);
+    return;
+  }
   if (EYE) { camera.position.set(...EYE); camera.lookAt(...LOOK); return; }
   if (window.__eye) { const E = window.__eye; camera.position.set(E[0], E[1], E[2]); camera.lookAt(E[3], E[4], E[5]); return; } // (tools: a camera set from outside)
   const lead = new THREE.Vector3(spider.vel.x * 0.45, 0, spider.vel.z * 0.45);
@@ -105,17 +114,34 @@ function updateCamera(dt, t) {
   camTarget.z = damp(camTarget.z, spider.pos.z + lead.z, 3.5, dt);
   camTarget.y = damp(camTarget.y, spider.pos.y * 0.5, 3, dt);
   shake = Math.max(0, shake - dt * 3);
-  const sx = (Math.sin(t * 61) + Math.sin(t * 37)) * shake * 0.08, sz = (Math.sin(t * 53) + Math.sin(t * 29)) * shake * 0.08;
+  const sk = settings.shake ? shake : 0;
+  const sx = (Math.sin(t * 61) + Math.sin(t * 37)) * sk * 0.08, sz = (Math.sin(t * 53) + Math.sin(t * 29)) * sk * 0.08;
   camera.position.set(camTarget.x + sx, camTarget.y + CAM.height, camTarget.z + CAM.back + sz);
   camera.lookAt(camTarget.x + sx * 0.5, camTarget.y, camTarget.z + sz * 0.5);
 }
 
 const post = new Post(renderer);
-addEventListener('resize', () => {
+function resize() {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * settings.resolution);
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   post.resize();
-});
+}
+addEventListener('resize', resize);
+
+// settings (settings.js; kept in the browser): volumes, post, shadows, resolution, shake
+const settings = loadSettings();
+function applySettings(changed) {
+  setVolumes({ master: settings.master, effects: settings.effects, ambience: settings.ambience });
+  if (!Q.has('nopost')) postParams.on = settings.post;
+  if (!changed || changed === 'resolution') resize();
+  if (!changed || changed === 'shadows') {
+    const on = settings.shadows !== 'off', size = settings.shadows === 'low' ? 512 : 1024;
+    if (renderer.shadowMap.enabled !== on) { renderer.shadowMap.enabled = on; scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; }); }
+    for (const l of lab.lights || []) if (l.castShadow && l.shadow.mapSize.x !== size) { l.shadow.mapSize.set(size, size); l.shadow.map?.dispose(); l.shadow.map = null; }
+  }
+  saveSettings(settings);
+}
 
 // input
 const keys = new Set();
@@ -136,11 +162,11 @@ function pick(i) {
   hud.closeChoice();
 }
 addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { onEscape(); return; }
+  if (mode !== 'play') return;
   keys.add(e.code);
-  if (e.code === 'KeyP') auto = !auto;
-  if (e.code === 'KeyR' && state.over) location.reload();
+  if (e.code === 'KeyP' && (Q.has('dev') || auto)) auto = !auto; // (the autopilot: a dev tool)
   if (choosing) { if (/^Digit[123]$/.test(e.code)) pick(+e.code.slice(-1) - 1); return; }
-  if (e.code === 'Digit1') postParams.on = !postParams.on;
   for (const [slot, key] of Object.entries(SLOT_KEYS)) if (e.code === 'Key' + key && !state.over && people) mutations.trigger(slot, ctx);
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
@@ -161,6 +187,41 @@ function readInput() {
   return { x: x / l, z: z / l, sprint, face: Math.atan2(aim.x - spider.pos.x, aim.z - spider.pos.z) };
 }
 
+// ---------------------------------------------------------------- the run's frame: title, play, pause, the end
+// mode: 'title' (the bay, slowly circled; the menu), 'play', 'paused', 'over' (the world goes on behind the summary)
+const menu = new Menu();
+menu.click = () => sfx('ui');
+let mode = SHOT || auto || GYM || Q.has('play') || sessionStorage.getItem('arachnophobia.go') ? 'play' : 'title'; // (?play: skip the title)
+sessionStorage.removeItem('arachnophobia.go');
+let runTime = 0;
+function startRun() { startAudio(); mode = 'play'; menu.hide(); hud.show(true); }
+function showTitle() { menu.title({ seed: SEED, onStart: startRun, onSettings: () => showSettings(showTitle) }); }
+function showPause() { menu.pause({ onResume: resume, onSettings: () => showSettings(showPause), onRestart: () => go(''), onQuit: () => go('', false) }); }
+function showSettings(back) { menu.settings(settings, (k, v) => { settings[k] = v; applySettings(k); }, back); }
+function pause() { mode = 'paused'; keys.clear(); hud.show(false); showPause(); }
+function resume() { mode = 'play'; menu.hide(); hud.show(true); }
+function onEscape() {
+  if (menu.screen === 'settings') { if (mode === 'title') showTitle(); else if (mode === 'paused') showPause(); return; }
+  if (mode === 'play' && !choosing) pause(); else if (mode === 'paused') resume();
+}
+// a new run (or this facility again): reload, straight into play
+function go(search, play = true) { if (play) sessionStorage.setItem('arachnophobia.go', '1'); if (location.search === search || (!search && !location.search)) location.reload(); else location.search = search; }
+function endRun(escaped) {
+  if (state.over) return;
+  state.over = true; mode = 'over';
+  const dead = people ? people.list.filter((h) => h.state === 'dead' || h.state === 'gone') : [];
+  const mm = Math.floor(runTime / 60), ss = Math.floor(runTime % 60);
+  const stats = [
+    ['TIME', mm + ':' + String(ss).padStart(2, '0')],
+    ['SCIENTISTS KILLED', dead.filter((h) => h.type === 'scientist').length],
+    ['SOLDIERS KILLED', dead.filter((h) => h.type === 'soldier').length],
+    ['MUTATIONS', Object.values(mutations.have).map((id) => MUTATIONS[id].name).join(', ') || 'none'],
+    ['LOCKS DESTROYED', lab.locks.filter((L) => L.destroyed).length + ' / ' + lab.locks.length],
+    ['FACILITY', SEED],
+  ];
+  setTimeout(() => { hud.show(false); menu.end({ escaped, stats, onNew: () => go(''), onRetry: () => go('?seed=' + SEED), onTitle: () => go('', false) }); }, escaped ? 1600 : 1200);
+}
+
 // ?measure: leg / body clipping into obstacles, every frame (tools/clipcheck.mjs reads window.game.clip)
 const clip = Q.has('measure') ? { frames: 0, bad: 0, deep: 0, max: 0, maxAt: 0, legFrames: 0, worst: [], kinds: {} } : null;
 function measureClip() {
@@ -179,20 +240,28 @@ function measureClip() {
 const lockTargets = lab.locks.map((L) => ({ isTarget: true, x: L.x, z: L.z, y: L.h - 1.2, alive: () => !L.destroyed, onHit: (d) => hitLock(L, d) }));
 function hitLock(L, d) {
   L.hp -= d * 1.8; // (about 6 s of steady slashing per lock: long enough to be a stand under fire)
-  fx.burst(new THREE.Vector3(L.x + (Math.random() - 0.5) * L.w * 0.6, L.h * 0.8, L.z + (Math.random() - 0.5) * L.d * 0.6), 'spark', 14);
+  const hp = new THREE.Vector3(L.x + (Math.random() - 0.5) * L.w * 0.6, L.h * 0.8, L.z + (Math.random() - 0.5) * L.d * 0.6);
+  fx.burst(hp, 'spark', 16); fx.burst(hp, 'chips', 6); fx.burst(hp, 'smoke', 1, null, 0.4);
   shake = Math.min(1, shake + 0.15);
   sfx('metal');
   if (L.hp > 0) return;
   L.destroyed = true;
   L.lamp.material.color.setRGB(0.02, 0.02, 0.02); L.light.intensity = 0;
   L.group.rotation.z = 0.05;
-  for (let i = 0; i < 4; i++) fx.burst(new THREE.Vector3(L.x, L.h * 0.6, L.z), 'spark', 30);
+  // it blows: a fireball, a column of black smoke, sparks and chips everywhere, a shockwave
+  const bp = new THREE.Vector3(L.x, L.h * 0.6, L.z);
+  fx.burst(bp, 'flash', 2); fx.burst(bp, 'fire', 28, null, 1.2); fx.burst(bp, 'smoke', 26, new THREE.Vector3(0, 0.6, 0), 1.2);
+  fx.burst(bp, 'spark', 90, null, 1.4); fx.burst(bp, 'chips', 30, null, 1.2); fx.burst(bp.setY(0.3), 'dust', 18, null, 1.6);
+  fx.ring(L.x, L.z, 9, 0xffc890);
   // its fluids out across the floor: the pumps' hydraulic oil (a lot), the generator's (a little)
   spill.add(L.x, L.z, L.kind === 'pumps' ? 2.4 : 1.4, 0, 0, L.kind === 'pumps' ? 3 : 1.2);
   damage.scorch(L.x, L.z, 2.8);
   shake = 1.4; hitStop = 0.08;
   sfx('boom');
-  if (lab.locks.every((o) => o.destroyed) && lab.door) { lab.door.unlocked = true; hud.notice('THE DOOR IS OPEN'); sfx('door'); }
+  if (lab.locks.every((o) => o.destroyed) && lab.door) {
+    lab.door.unlocked = true; hud.notice('THE DOOR IS OPEN'); sfx('door');
+    for (let i = 0; i < 14; i++) fx.burst(new THREE.Vector3(lab.door.x + (i / 13 - 0.5) * lab.door.w, 3.5, lab.door.z + 0.5), 'dust', 2, new THREE.Vector3(0, -0.4, 0.5));
+  }
 }
 function updateGoal(dt) {
   for (const L of lab.locks) {
@@ -211,7 +280,7 @@ function updateGoal(dt) {
   D.sun.intensity = 1600 * D.open;
   if (D.open > 0.6 && !D.solid.open) { D.solid.open = true; lab.clearHeight(D.x - D.w / 2, D.x + D.w / 2, D.z - 0.5, D.z + 0.5); }
   if (D.solid.open && !state.over && Math.abs(spider.pos.x - D.x) < D.w / 2 && spider.pos.z < D.z + 0.3) {
-    state.over = true; hud.end('ESCAPED'); sfx('door');
+    endRun(true); sfx('door');
   }
 }
 
@@ -232,7 +301,7 @@ function breakVat(b) {
   for (const m of b.parts) m.visible = false;
   b.light.intensity = 2;
   const p = new THREE.Vector3(b.x, 1.2, b.z);
-  fx.burst(p, 'spark', 30); fx.burst(p, 'ichor', 24);
+  fx.burst(p, 'ichor', 50, new THREE.Vector3(0, 1, 0), 1.3); fx.burst(p, 'ichormist', 10, null, 1.2); fx.burst(p.setY(0.4), 'dust', 6, null, 1);
   // the vat empties across the floor
   spill.add(b.x, b.z, 1.8, 0, 4);
   damage.shards(b.x, 0.35, b.z, 45, _shotDir.set(b.x - spider.pos.x, 0, b.z - spider.pos.z).normalize());
@@ -243,6 +312,7 @@ function breakVat(b) {
   if (offer.length) {
     choosing = offer;
     hud.choose(offer.map((id) => ({ id, ...MUTATIONS[id], slotName: SLOT_NAMES[MUTATIONS[id].slot], key: SLOT_KEYS[MUTATIONS[id].slot] })), pick);
+    sfx('ui');
   } else state.hp = Math.min(100, state.hp + 40); // every slot filled: (improvements to come) a heal for now
 }
 
@@ -255,7 +325,8 @@ function frame(now) {
   let dt = SHOT ? 1 / 60 : real;
   if (hitStop > 0) { hitStop -= dt; dt *= 0.06; }
   if (choosing && Q.has('auto')) pick(0); // (the autopilot takes the first offer)
-  if (choosing) dt = 0;
+  if (choosing || (mode !== 'play' && mode !== 'over')) dt = 0;
+  if (mode === 'play') runTime += dt;
   ray.setFromCamera(mouse, camera); ray.ray.intersectPlane(floorPlane, aim);
   if (dt > 0) {
     time += dt;
@@ -274,12 +345,14 @@ function frame(now) {
     }
     for (const e of spider.events) {
       if (e.type === 'step') { shake = Math.min(0.6, shake + 0.06); sfx('step', 0.6); footprint(e); }
-      if (e.type === 'slash') { shake = Math.min(1, shake + 0.22); hitStop = 0.035; sfx('slash'); }
+      if (e.type === 'slash') { shake = Math.min(1, shake + 0.22); hitStop = 0.045; sfx('slash'); fx.swipe(spider.pos, spider.heading, 3.3, Math.max(1.2, e.pos.y + 0.8)); }
       if (e.type === 'impale') { shake = Math.min(1, shake + 0.4); hitStop = 0.06; sfx('slash'); sfx('squelch'); state.log.push(['impale', +time.toFixed(2)]); }
       if (e.type === 'eat') { state.hp = Math.min(100, state.hp + 30); sfx('squelch'); }
       if (e.type === 'land' && people) { // the pounce comes down: everyone close is hit and stunned
         shake = 1.2; hitStop = 0.05; sfx('land');
-        fx.burst(e.pos.clone().setY(0.2), 'spark', 20);
+        // a shockwave, dust thrown out in a ring, chips
+        fx.ring(e.pos.x, e.pos.z, 7); fx.burst(e.pos.clone().setY(0.3), 'chips', 18, null, 1.3);
+        for (let i = 0; i < 20; i++) { const a = (i / 20) * 6.28; fx.burst(new THREE.Vector3(e.pos.x + Math.cos(a) * 1.5, 0.3, e.pos.z + Math.sin(a) * 1.5), 'dust', 1, new THREE.Vector3(Math.cos(a) * 2, 0.1, Math.sin(a) * 2), 0.3); }
         for (const h of people.list) {
           if (people.alive(h) && Math.hypot(h.x - e.pos.x, h.z - e.pos.z) < 3.4) { people.hit(h, 2, new THREE.Vector3(h.x - e.pos.x, 0, h.z - e.pos.z)); people.stun(h, 2.2); }
         }
@@ -301,7 +374,6 @@ function frame(now) {
             if (t >= 0) damage.hole(e.to, _shotFar.lerpVectors(e.to, _shotFar, t));
           }
         }
-        if (e.type === 'shot' && e.hit) fx.burst(new THREE.Vector3(e.to.x, e.to.y, e.to.z), 'ichor', 4, new THREE.Vector3(0, 0.5, 0)); // the spider bleeds its own pink
         if (e.type === 'shot' && e.hit && !state.over && !Q.has('god')) { state.hp -= e.damage; state.hurt = 1; state.lastHurt = time; shake = Math.min(0.8, shake + 0.08); }
       }
       state.kills = people.list.filter((h) => h.state === 'dead' || h.state === 'gone').length;
@@ -316,12 +388,14 @@ function frame(now) {
   // hurt: a red pulse in the post pass
   state.hurt = Math.max(0, state.hurt - real * 4);
   post.flash.set(0.16 * state.hurt, 0.004 * state.hurt, 0);
-  if (state.hp <= 0 && !state.over) { state.over = true; hud.end('SPECIMEN TERMINATED'); }
+  if (state.hp <= 0 && !state.over) { endRun(false); fx.wound(spider.pos.clone().setY(1.5), null, 4, true); }
+  // a prompt only when there is something to do right now: a body to feed on
+  hud.hint(mode === 'play' && people && state.hp < 99 && !spider.feeding && people.corpse(spider.pos.x + Math.sin(spider.heading) * 1.8, spider.pos.z + Math.cos(spider.heading) * 1.8, 3.2) ? 'F' : null, 'FEED');
   hud.set(state.hp, state.kills);
   hud.locks(lab.locks.filter((L) => L.destroyed).length, lab.locks.length, lab.door?.unlocked);
   hud.slots(SLOTS.map((slot) => {
-    const id = mutations.have[slot];
-    return { slot: SLOT_NAMES[slot], name: id ? MUTATIONS[id].name : null, key: SLOT_KEYS[slot], cd: mutations.cd[slot] || 0, max: id ? MUTATIONS[id].cooldown || 0 : 0 };
+    const id = mutations.have[slot], M = id ? MUTATIONS[id] : null;
+    return { slot, slotName: SLOT_NAMES[slot], id, name: M?.name, text: M?.text, key: SLOT_KEYS[slot], cd: mutations.cd[slot] || 0, max: M?.cooldown || 0 };
   }));
   lab.update(time, spider.pos);
   dust.update(dt, time);
@@ -329,8 +403,13 @@ function frame(now) {
   post.render(scene, camera, time);
   requestAnimationFrame(frame);
 }
+applySettings();
 updateCamera(1, 0);
+await renderer.compileAsync(scene, camera).catch(() => {});
+post.render(scene, camera, 0); post.render(scene, camera, 0);
 requestAnimationFrame(frame);
+if (mode === 'title') showTitle(); else hud.show(true);
+setTimeout(() => menu.reveal(), 120);
 
 // for tools and the console
 window.game = { seed: SEED, spill, damage, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };

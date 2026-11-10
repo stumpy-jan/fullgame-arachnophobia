@@ -67,17 +67,22 @@ export class People {
     return best;
   }
 
-  // damage (the slash, quills, a pounce): blood, a stagger; dead at 0 hp. A heavy killing blow (the slash, a
-  // pounce) usually takes a part off: the head, an arm or a leg flies, a stump left
+  // damage (the slash, quills, a pounce): blood spurting along the blow, a stagger; dead at 0 hp (one slash kills
+  // a scientist, two a soldier). A killing blow tears the body apart: two to four parts fly off (head, arms, legs)
+  // and what's left is thrown along the blow, tumbling, to land in a heap and bleed out
   hit(h, dmg, dir) {
     if (!this.alive(h)) return;
     h.hp -= dmg;
-    const p = new THREE.Vector3(h.x, 1.3, h.z), d = dir ? dir.clone().setY(0).normalize() : null;
-    this.fx.burst(p, 'blood', 12, d);
+    const p = new THREE.Vector3(h.x, 1.25, h.z), d = dir ? dir.clone().setY(0).normalize() : null;
+    this.fx.wound(p, d ? _W.set(d.x, 0.35, d.z) : null, h.hp <= 0 ? 1.8 : 1.1);
     if (h.hp <= 0) {
       this.kill(h);
-      if (dmg >= 2 && d) { const n = this.R() < 0.15 ? 0 : this.R() < 0.7 ? 1 : 2; for (let i = 0; i < n; i++) this.sever(h, d); }
-      if (d) { h.x += d.x * 0.6; h.z += d.z * 0.6; h.heading = Math.atan2(d.x, d.z); }
+      if (d) {
+        h.heading = Math.atan2(-d.x, -d.z); // (falls backwards, away from the blow)
+        if (dmg >= 1.5) { const n = 2 + Math.floor(this.R() * 3); for (let i = 0; i < n; i++) this.sever(h, d); }
+        const sp = 3 + this.R() * 3;
+        h.kv = new THREE.Vector3(d.x * sp, 2.2 + this.R() * 1.8, d.z * sp); h.spin = (this.R() - 0.5) * 8;
+      }
     }
     else { h.stunT = Math.max(h.stunT, 0.35); this.alarm = 0; }
   }
@@ -91,14 +96,14 @@ export class People {
 
   grab(h) {
     h.state = 'held'; h.flail = true; h.aim = 0;
-    this.fx.burst(new THREE.Vector3(h.x, h.y + 1.4, h.z), 'blood', 18);
+    this.fx.wound(new THREE.Vector3(h.x, h.y + 1.4, h.z), _W.set(0, 0.8, 0), 1.2);
     this.fx.stain(h.x, h.z, 0.7);
     this.alarm = 0; // a scream: everyone nearby hears it
   }
   // eaten: gone, leaving the mess
   consume(h) {
     h.state = 'gone';
-    this.fx.burst(new THREE.Vector3(h.x, h.y + 1.2, h.z), 'blood', 26);
+    this.fx.wound(new THREE.Vector3(h.x, h.y + 1.2, h.z), _W.set(0, 0.6, 0), 2);
     this.fx.stain(h.x, h.z, 1.1);
   }
   // a part comes off and flies: a clone of the joint's subtree, where it was, thrown along the blow
@@ -122,7 +127,7 @@ export class People {
     });
     if (this.gibs.length > 80) this.gibs.shift();
     const at = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
-    this.fx.burst(at, 'blood', 22, new THREE.Vector3(dir.x, 0.6, dir.z));
+    this.fx.wound(at, _W.set(dir.x, 0.6, dir.z), 1.4);
     h.bleed = (h.bleed || 0) + 3; // the stump pumps for a while
   }
   updateGibs(dt) {
@@ -130,10 +135,12 @@ export class People {
     for (const b of this.gibs) {
       const o = b.obj;
       if (b.bleed > 0) b.bleed -= dt;
-      const floor = this.world.heightAt(o.position.x, o.position.z) + 0.06;
+      let floor = this.world.heightAt(o.position.x, o.position.z) + 0.06;
       if (!b.rest) {
         b.v.y -= g * dt;
+        const ox = o.position.x, oz = o.position.z;
         o.position.addScaledVector(b.v, dt);
+        if (this.world.heightAt(o.position.x, o.position.z) > o.position.y + 0.25) { o.position.x = ox; o.position.z = oz; b.v.x *= -0.4; b.v.z *= -0.4; } // a wall: bounce off
         q.setFromAxisAngle(_GA.copy(b.w).normalize(), b.w.length() * dt); o.quaternion.premultiply(q);
         // a trail of drops in the air
         b.dripT -= dt;
@@ -161,8 +168,7 @@ export class People {
   release(h, kill = true) { h.flail = false; if (kill) this.kill(h); else h.state = 'flee'; }
   kill(h) {
     h.state = 'dead'; h.flail = false; h.fall = 0; h.deadT = 0;
-    this.fx.stain(h.x, h.z, 0.9);
-    for (let i = 0; i < 3; i++) this.fx.burst(new THREE.Vector3(h.x, 0.8, h.z), 'blood', 10);
+    this.fx.stain(h.x, h.z, 0.6);
   }
 
   update(dt, time) {
@@ -178,6 +184,19 @@ export class People {
       if (h.state === 'gone') continue;
       if (h.state === 'dead') {
         h.fall = Math.min(1, h.fall + dt / 0.45); h.stride = damp(h.stride, 0, 8, dt);
+        if (h.kv) { // thrown: fly, spin, bounce off walls, land
+          const ox = h.x, oz = h.z;
+          h.kv.y -= 9.8 * dt; h.x += h.kv.x * dt; h.z += h.kv.z * dt; h.y += h.kv.y * dt; h.heading += h.spin * dt;
+          const fl = world.heightAt(h.x, h.z);
+          if (fl > h.y + 0.3) { h.x = ox; h.z = oz; h.kv.x *= -0.35; h.kv.z *= -0.35; } // a wall: back off it
+          if (Math.hypot(h.kv.x, h.kv.z) > 1) { h.dripT = (h.dripT || 0) - dt; if (h.dripT < 0) { h.dripT = 0.05; this.fx.spill?.add(h.x, h.z, 0.12, 0.05); } }
+          const floor = Math.max(0, world.heightAt(h.x, h.z));
+          if (h.y <= floor) {
+            h.y = floor;
+            if (h.kv.y < -2) { this.fx.spill?.add(h.x, h.z, 0.4, 0.2); this.fx.burst(_W.set(h.x, h.y + 0.3, h.z), 'blood', 8, null, 0.8); h.kv.y *= -0.25; h.kv.x *= 0.45; h.kv.z *= 0.45; h.spin *= 0.4; }
+            else { h.kv.y = 0; h.kv.x *= 1 - Math.min(1, 6 * dt); h.kv.z *= 1 - Math.min(1, 6 * dt); h.spin *= 1 - Math.min(1, 6 * dt); if (Math.hypot(h.kv.x, h.kv.z) < 0.1) h.kv = null; }
+          }
+        }
         // a body bleeds out into a pool over the first seconds (longer from a stump)
         h.deadT = (h.deadT || 0) + dt; h.bleedT = (h.bleedT || 0) - dt;
         if (h.deadT < 5 + (h.bleed || 0) && h.bleedT < 0) { h.bleedT = 0.25; this.fx.spill?.add(h.x + Math.sin(h.heading) * 0.5 + (R() - 0.5) * 0.3, h.z + Math.cos(h.heading) * 0.5 + (R() - 0.5) * 0.3, 0.35, 0.05); }
@@ -309,14 +328,15 @@ export class People {
     h.lastShot = this.time;
     const t = this.world.shotHit(from, _A);
     const end = t >= 0 ? _E.lerpVectors(from, _A, t) : _E.copy(_A);
-    this.fx.tracer(from, end);
+    this.fx.shot(from, end);
     this.fx.flash(from);
     const hit = t < 0 && this.R() < T.accuracy;
-    if (t >= 0) this.fx.burst(end, 'spark', 7, _D.subVectors(from, end).normalize());
-    else if (hit) this.fx.burst(end, 'ichor', 6);
+    if (t >= 0) this.fx.impact(end, _D.subVectors(from, end).normalize());
+    else if (hit) this.fx.wound(end, _D.subVectors(end, from).normalize().setY(0.3), 0.6, true);
     this.events.push({ type: 'shot', from: from.clone(), to: end.clone(), hit, damage: hit ? T.damage : 0, blocked: t >= 0 });
   }
 }
 
+const _W = new THREE.Vector3();
 const _GQ = new THREE.Quaternion(), _GI = new THREE.Quaternion(), _GY = new THREE.Vector3(), _GF = new THREE.Vector3(), _GA = new THREE.Vector3();
 const _LA = new THREE.Vector3(), _LB = new THREE.Vector3(), _LD = new THREE.Vector3(), _S = new THREE.Vector3(), _G = new THREE.Vector3(), _A = new THREE.Vector3(), _M = new THREE.Vector3(), _E = new THREE.Vector3(), _D = new THREE.Vector3();

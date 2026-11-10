@@ -35,6 +35,7 @@ await page.keyboard.down('KeyW');
 const t1 = Date.now();
 while (Date.now() - t1 < 15000) { if (await page.evaluate(() => game.state.over)) break; await page.waitForTimeout(250); }
 await page.keyboard.up('KeyW');
-console.log('over', await page.evaluate(() => [game.state.over, document.getElementById('over').textContent, game.spider.pos.z.toFixed(2)]));
+await page.waitForTimeout(2200);
+console.log('over', await page.evaluate(() => [game.state.over, document.querySelector('#menu h2')?.textContent, game.spider.pos.z.toFixed(2)]));
 await page.screenshot({ path: 'shots/goal_end.png' });
 await browser.close();

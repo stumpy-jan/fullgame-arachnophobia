@@ -1,13 +1,22 @@
 // Sound, synthesised in Web Audio (nothing to download, after Skyward's audio.js). Starts on the first key or
 // click (browsers allow audio only after one). sfx(name, gain) plays a one-shot; the ambience (a low facility
 // hum and a far-off two-tone siren) runs underneath.
-let ac = null, master = null, noiseBuf = null;
+let ac = null, master = null, fxBus = null, ambBus = null, noiseBuf = null;
+const vol = { master: 0.8, effects: 1, ambience: 0.7 };
+// volumes (0-1) from the settings; they apply now or when the sound starts
+export function setVolumes(v) {
+  Object.assign(vol, v);
+  if (!ac) return;
+  master.gain.value = 0.7 * vol.master; fxBus.gain.value = vol.effects; ambBus.gain.value = vol.ambience;
+}
 export const audioOpts = { siren: true }; // (the gym turns the siren off)
 
 function start() {
   if (ac) return;
   ac = new (window.AudioContext || window.webkitAudioContext)();
-  master = ac.createGain(); master.gain.value = 0.55; master.connect(ac.destination);
+  master = ac.createGain(); master.connect(ac.destination);
+  fxBus = ac.createGain(); fxBus.connect(master); ambBus = ac.createGain(); ambBus.connect(master);
+  setVolumes({});
   noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -15,17 +24,18 @@ function start() {
 }
 addEventListener('keydown', start, { once: false });
 addEventListener('mousedown', start, { once: false });
+export const startAudio = start;
 
 const now = () => ac.currentTime;
 function env(g, t0, a, peak, decay) { g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + decay); }
-function noise(t0, dur, filter, freq, q, peak, decay, out = master) {
+function noise(t0, dur, filter, freq, q, peak, decay, out = fxBus) {
   const s = ac.createBufferSource(); s.buffer = noiseBuf; s.playbackRate.value = 0.7 + Math.random() * 0.6;
   const f = ac.createBiquadFilter(); f.type = filter; f.frequency.value = freq; f.Q.value = q;
   const g = ac.createGain(); env(g, t0, 0.004, peak, decay);
   s.connect(f).connect(g).connect(out); s.start(t0, Math.random() * 1.5, dur);
   return f;
 }
-function tone(t0, type, f0, f1, peak, decay, out = master) {
+function tone(t0, type, f0, f1, peak, decay, out = fxBus) {
   const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + decay);
   const g = ac.createGain(); env(g, t0, 0.005, peak, decay);
   o.connect(g).connect(out); o.start(t0); o.stop(t0 + decay + 0.05);
@@ -51,6 +61,7 @@ export function sfx(name, gain = 1) {
     case 'quill': noise(t, 0.25, 'bandpass', 3200, 1.5, 0.18 * k, 0.15); break;
     case 'door': noise(t, 3.2, 'lowpass', 140, 1, 0.6 * k, 3.0); tone(t, 'sawtooth', 48, 40, 0.15 * k, 3.0); break;
     case 'casing': for (let i = 0; i < 2; i++) tone(t + 0.3 + i * 0.09 + Math.random() * 0.1, 'sine', 3600 + Math.random() * 1800, 3000, 0.035 * k, 0.07); break; // brass on concrete
+    case 'ui': tone(t, 'sine', 900, 700, 0.06 * k, 0.05); break;
     case 'squelch': noise(t, 0.3, 'lowpass', 500, 4, 0.5 * k, 0.25); tone(t, 'sine', 140, 50, 0.25 * k, 0.2); break;
   }
 }
@@ -61,14 +72,14 @@ function ambience() {
   const hum = ac.createOscillator(); hum.type = 'sawtooth'; hum.frequency.value = 50;
   const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 140;
   const g = ac.createGain(); g.gain.value = 0.05;
-  hum.connect(lp).connect(g).connect(master); hum.start();
+  hum.connect(lp).connect(g).connect(ambBus); hum.start();
   if (!audioOpts.siren) return;
   const siren = ac.createOscillator(); siren.type = 'triangle'; siren.frequency.value = 600;
   const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 0.55;
   const lfoG = ac.createGain(); lfoG.gain.value = 110; lfo.connect(lfoG).connect(siren.frequency);
   const sf = ac.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 650; sf.Q.value = 2;
   const sg = ac.createGain(); sg.gain.value = 0.018;
-  siren.connect(sf).connect(sg).connect(master); siren.start(); lfo.start();
+  siren.connect(sf).connect(sg).connect(ambBus); siren.start(); lfo.start();
 }
 
 // how loud a sound at (x, z) is for a listener at (lx, lz): full within 8 m, gone by 45

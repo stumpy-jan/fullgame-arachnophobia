@@ -28,14 +28,14 @@ export function spillShader(sh) {
       float wet = max(wb, max(wi, wo));
       float grain = dot(diffuseColor.rgb, vec3(0.3, 0.5, 0.2));   // the floor's own texture shows through thin liquid
       // dried blood: a dark brown-red stain that stays
-      diffuseColor.rgb *= mix(vec3(1.0), vec3(0.34, 0.14, 0.11), clamp(sp.a, 0.0, 1.0) * 0.85);
+      diffuseColor.rgb *= mix(vec3(1.0), vec3(0.42, 0.1, 0.08), clamp(sp.a, 0.0, 1.0) * 0.8);
       // fresh liquid: thin films are lighter and show the floor; pools are dark and smooth; edges darken (a rim)
-      vec3 blood = mix(vec3(0.11, 0.006, 0.005), vec3(0.05, 0.0012, 0.0012), smoothstep(0.03, 0.35, sp.r));
+      vec3 blood = mix(vec3(0.26, 0.006, 0.004), vec3(0.11, 0.0015, 0.001), smoothstep(0.03, 0.35, sp.r));
       vec3 ichor = mix(vec3(0.3, 0.02, 0.17), vec3(0.12, 0.004, 0.065), smoothstep(0.03, 0.35, sp.g));
       vec3 oil = vec3(0.01, 0.009, 0.008);
       float tot = sp.r * wb + sp.g * wi + sp.b * wo + 1e-5, depth = sp.r + sp.g + sp.b;
       vec3 liq = (blood * sp.r * wb + ichor * sp.g * wi + oil * sp.b * wo) / tot;
-      liq *= mix(0.4 + 0.75 * grain, 1.0, smoothstep(0.03, 0.2, depth));
+      liq *= mix(0.6 + 0.5 * grain, 1.0, smoothstep(0.03, 0.2, depth));
       liq *= 1.0 - 0.45 * smoothstep(0.004, 0.02, depth) * (1.0 - smoothstep(0.02, 0.07, depth));
       diffuseColor.rgb = mix(diffuseColor.rgb, liq, wet * 0.95);
       roughnessFactor = mix(roughnessFactor, mix(0.55, 0.24, smoothstep(0.03, 0.25, depth)), wet);

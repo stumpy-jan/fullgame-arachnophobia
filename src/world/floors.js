@@ -7,9 +7,9 @@ import { spillShader } from '../spill.js';
 // with a no-tile shader so a 2.5 m texture never shows its grid; the server room is a raised access floor
 // painted in code (its tiles are real, so they may repeat).
 export const FLOOR_TYPES = {
-  lab: { tex: 'concrete_floor_painted', size: 2, tint: 0xcfd9d4, rough: 0.85, normal: 0.5 },   // sealed, satin
+  lab: { tex: 'concrete_floor_painted', size: 2, tint: 0xcfd9d4, rough: 0.85, normal: 0.5, contrast: 0.22 }, // sealed, satin (its blotches repeat: flattened)
   containment: { tex: 'brushed_concrete', size: 2.5, tint: 0xd8d8d4, rough: 1, normal: 0.8 },  // power-trowelled
-  industrial: { tex: 'garage_floor', size: 1.89, tint: 0xa9adac, rough: 1, normal: 0.9 },      // oily, cracked
+  industrial: { tex: 'garage_floor', size: 1.89, tint: 0xa9adac, rough: 1, normal: 0.9, contrast: 0.6 }, // oily, cracked
   storage: { tex: 'brushed_concrete_2', size: 2.5, tint: 0xd0d0cc, rough: 1, normal: 0.8 },     // weathered
   server: { raised: true },
   default: { tex: 'brushed_concrete_2', size: 2.5, tint: 0xd0d0cc, rough: 1, normal: 0.8 },
@@ -42,7 +42,7 @@ export function floorMaterial(type) {
     map: s.map, normalMap: s.normal, normalScale: new THREE.Vector2(spec.normal, spec.normal),
     roughnessMap: s.arm, roughness: spec.rough, metalness: 0, color: spec.tint,
   });
-  noTile(m);
+  noTile(m, spec.contrast ?? 0.85);
   return (mats[key] = m);
 }
 
@@ -72,7 +72,7 @@ vec4 textureNoTile(sampler2D samp, vec2 uv) {
   vec4 b = textureGrad(samp, uv + sin(vec2(3.0, 7.0) * (i + 1.0)), dx, dy);
   return mix(a, b, smoothstep(0.2, 0.8, f - 0.1 * dot(a.xyz - b.xyz, vec3(1.0))));
 }`;
-export function noTile(material) {
+export function noTile(material, contrast = 1) {
   material.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vNtWorld;')
@@ -81,13 +81,16 @@ export function noTile(material) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${NOTILE}`)
       .replace('#include <map_fragment>', chunk('map_fragment') + `
+        // less of the photo's own contrast: towards its average colour (its smallest mip), so distinctive
+        // blotches don't read as a repeat; the world-scale variation below carries the floor instead
+        diffuseColor.rgb = mix(diffuse * textureLod(map, vec2(0.5), 12.0).rgb, diffuseColor.rgb, ${contrast.toFixed(2)});
         diffuseColor.rgb *= 0.86 + 0.26 * ntNoise(vNtWorld.xz * 0.07) * (0.7 + 0.3 * ntNoise(vNtWorld.xz * 0.31));`)
       .replace('#include <roughnessmap_fragment>', chunk('roughnessmap_fragment') + `
         roughnessFactor = clamp(roughnessFactor * (0.85 + 0.3 * ntNoise(vNtWorld.xz * 0.2 + 17.0)), 0.04, 1.0);`)
       .replace('#include <normal_fragment_maps>', chunk('normal_fragment_maps'));
     spillShader(sh); // liquids on the floor (spill.js)
   };
-  material.customProgramCacheKey = () => 'notile';
+  material.customProgramCacheKey = () => 'notile' + contrast;
 }
 
 // ------------------------------------------------------------------ the server room's raised floor

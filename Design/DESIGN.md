@@ -91,6 +91,16 @@ Sprinter, Leaper. Glands: Acid trail, Web trail.
   footprints after stepping in a pool. **Battle damage built** (`src/damage.js`): bullet holes chipped into whatever concrete stops a shot (misses fly on into the wall behind), brass casings piling up round the soldiers, glass bursting out of smashed vats (and lying round the start tank), soot burnt into the floor where a lock blows.
 - The monster doesn't grow much: it changes through its mutations (modular, swappable parts).
 
+## Feel (built)
+
+- One slash kills a scientist, two a soldier; a killing blow tears the body apart (two to four parts fly, the rest
+  is thrown along the blow and lands in its own blood). Blood is vivid red (exempt from the colour grade).
+- Everything that happens shows from 34 m up: rounds are streaks with smoke trails, concrete throws dust and chips,
+  hits spurt blood (the spider bleeds pink), the slash leaves a pale arc, quills leave a trail, the pounce a
+  shockwave, a lock blows in fire and black smoke.
+- A run is framed: a loading veil (nothing pops in), the title over the start bay, pause and settings, a summary
+  at the end. The HUD is quiet: icons for the slots (tooltips), a prompt only when there's something to do.
+
 ## Open questions
 
 - Facing: confirm "movement direction while moving, mouse when slow".

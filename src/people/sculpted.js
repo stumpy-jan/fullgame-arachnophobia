@@ -142,7 +142,7 @@ export function sculpted(type, { dark = false, seed = 1, gear = true } = {}) {
     }
     flash = new THREE.Mesh(C(THREE.SphereGeometry, 0.09, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 6, 2.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     flash.position.set(0, 0.02, muzzle + 0.05); flash.visible = false; gun.add(flash);
-    laser = new THREE.Mesh(cached('laser', () => new THREE.BoxGeometry(0.008, 0.008, 16).translate(0, 0, 8)), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.25, 0.12), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    laser = new THREE.Mesh(cached('laser', () => new THREE.BoxGeometry(0.008, 0.008, 16).translate(0, 0, 8)), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.4, 0.07, 0.035), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     laser.position.set(0, 0.04, muzzle); gun.add(laser);
     torch = new THREE.Mesh(cached('torch', () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ map: coneTexture(), color: new THREE.Color(1.15, 1.0, 0.72), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     torch.rotation.y = Math.PI; torch.position.set(0, 0.012, 3.4); torch.scale.set(3.2, 1, 5.6); root.add(torch);
