@@ -17,3 +17,7 @@ assets/pilot/*/*.glb
 tools/_gym.mjs
 tools/_svg2png.mjs
 tools/_fps.mjs
+tools/_gore.mjs
+tools/_gore2.mjs
+tools/_gibtrace.mjs
+tools/_vat.mjs

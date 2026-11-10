@@ -6,7 +6,7 @@ import { splat } from './world/geom.js';
 //   tracer(a, b)            a bright streak from a to b, gone in a few frames
 //   flash(p)                a muzzle flash
 //   burst(p, kind, n, dir)  particles: 'spark' (bullets on concrete), 'ichor' (the spider hit), 'blood'
-//   stain(x, z, size)       a blood pool on the floor that stays
+//   stain(x, z, size)       a blood pool on the floor (into the spill, when there is one: spill.js)
 export class FX {
   constructor(scene) {
     this.scene = scene;
@@ -32,7 +32,7 @@ export class FX {
       const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: kind === 'add' ? 0.16 : 0.2, map: dot, vertexColors: true, transparent: true, depthWrite: false, blending }));
       pts.frustumCulled = false;
       scene.add(pts);
-      this.parts[kind] = { pts, N, next: 0, life: new Float32Array(N), vel: new Float32Array(N * 3), col: new Float32Array(N * 3), grav: new Float32Array(N) };
+      this.parts[kind] = { pts, N, next: 0, life: new Float32Array(N), vel: new Float32Array(N * 3), col: new Float32Array(N * 3), grav: new Float32Array(N), wet: new Uint8Array(N) };
     }
     // stains on the floor
     this.stainMat = new THREE.MeshStandardMaterial({ color: 0x1e0303, roughness: 0.68, metalness: 0, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, transparent: true, opacity: 0.92 });
@@ -68,10 +68,12 @@ export class FX {
       P.col[i * 3] = c[0]; P.col[i * 3 + 1] = c[1]; P.col[i * 3 + 2] = c[2];
       P.life[i] = life * (0.6 + this.R() * 0.4);
       P.grav[i] = grav;
+      P.wet[i] = kind === 'blood' ? 1 : kind === 'ichor' ? 2 : 0; // (lands as a drop in the spill)
     }
   }
 
   stain(x, z, size = 1) {
+    if (this.spill) { this.spill.add(x, z, 0.6 * size, 0.35 * size); return; } // (a pool in the spill)
     const m = new THREE.Mesh(splat(this.R, 1, 0.45), this.stainMat);
     m.rotation.x = -Math.PI / 2; m.rotation.z = this.R() * 6;
     m.position.set(x, 0.008, z);
@@ -105,7 +107,9 @@ export class FX {
         P.life[i] -= dt;
         P.vel[i * 3 + 1] -= P.grav[i] * dt;
         pos[i * 3] += P.vel[i * 3] * dt; pos[i * 3 + 1] += P.vel[i * 3 + 1] * dt; pos[i * 3 + 2] += P.vel[i * 3 + 2] * dt;
-        if (pos[i * 3 + 1] < 0.02) { pos[i * 3 + 1] = 0.02; P.vel[i * 3] *= 0.3; P.vel[i * 3 + 1] = 0; P.vel[i * 3 + 2] *= 0.3; }
+        if (pos[i * 3 + 1] < 0.02) {
+          if (P.wet[i] && this.spill) { const a = 0.025 + Math.random() * 0.04; this.spill.add(pos[i * 3], pos[i * 3 + 2], 0.06 + Math.random() * 0.1, P.wet[i] === 1 ? a : 0, P.wet[i] === 2 ? a : 0); P.wet[i] = 0; }
+          pos[i * 3 + 1] = 0.02; P.vel[i * 3] *= 0.3; P.vel[i * 3 + 1] = 0; P.vel[i * 3 + 2] *= 0.3; }
         const f = Math.min(1, P.life[i] * 6);
         col[i * 3] = P.col[i * 3] * f; col[i * 3 + 1] = P.col[i * 3 + 1] * f; col[i * 3 + 2] = P.col[i * 3 + 2] * f;
       }

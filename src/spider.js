@@ -569,7 +569,7 @@ export class Spider {
         l.hoverGoal.copy(l.foot);
         if (!l.hover) {
           this.bobV -= 0.3 + fast * 0.4;
-          this.events.push({ type: 'step', pos: l.foot.clone(), k: l.k });
+          this.events.push({ type: 'step', pos: l.foot.clone(), k: l.k, s: l.s });
         }
       }
     }

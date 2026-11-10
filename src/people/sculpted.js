@@ -34,6 +34,9 @@ function clothNormal() {
   return (_cloth = normalFromHeight(h, S, S, 2.5));
 }
 
+// the wet red of a cut (shared: it batches)
+const STUMP = new THREE.MeshStandardMaterial({ color: 0x5a0606, roughness: 0.32, metalness: 0 });
+
 export function sculpted(type, { dark = false, seed = 1 } = {}) {
   const R = rng(seed * 7919 + 13);
   const soldier = type === 'soldier';
@@ -138,9 +141,29 @@ export function sculpted(type, { dark = false, seed = 1 } = {}) {
     }
   }
 
+  // --- what can come off (dismemberment): the head at the neck, the arms at the shoulder, the legs at the hip.
+  // Each joint gets two hidden wet red caps: one on the body (the stump) and one on the part itself (shown on the
+  // flying piece, which is a clone of the joint's subtree: people.js)
+  const cuts = {};
+  for (const [name, joint, r] of [['head', neck, 0.055], ['armL', arms[0].up, 0.05 * bulk], ['armR', arms[1].up, 0.05 * bulk], ['legL', legs[0].thigh, 0.075 * bulk], ['legR', legs[1].thigh, 0.075 * bulk]]) {
+    const stump = add(C(THREE.SphereGeometry, 1, 12, 8), STUMP, joint.parent, joint.position.x, joint.position.y, joint.position.z);
+    stump.scale.set(r, r * 0.55, r); stump.visible = false;
+    const cap = add(C(THREE.SphereGeometry, 1, 12, 8), STUMP, joint, 0, 0, 0);
+    cap.scale.set(r, r * 0.55, r); cap.visible = false; cap.name = 'cap';
+    cuts[name] = { joint, stump };
+  }
+
   const st = { tail: 0, tailV: 0, look: 0, lookT: R() * 3 };
   return {
     group: root,
+    // cut a part off: the body shows a stump; returns the part's joint (clone it for the flying piece) or null
+    sever(name) {
+      const c = cuts[name];
+      if (!c || !c.joint.visible) return null;
+      c.joint.visible = false; c.stump.visible = true;
+      return c.joint;
+    },
+    cuts: Object.keys(cuts),
     // the rifle muzzle in the world (from the last update), for tracers; null if unarmed
     muzzle(out) { return flash ? flash.getWorldPosition(out) : null; },
     // the laser sight's beam: its start and direction in the world, and how far it reaches (stops on walls)

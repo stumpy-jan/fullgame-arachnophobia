@@ -22,6 +22,7 @@ export class People {
     this.world = world; this.spider = spider; this.fx = fx;
     this.R = rng(seed);
     this.list = [];
+    this.gibs = []; // severed parts, flying or lying (sever)
     this.maps = new PathMaps(world.nav);
     this.mapT = 1;
     this.events = [];
@@ -31,7 +32,7 @@ export class People {
       for (let i = 0; i < g.n; i++) this.spawn(g.type, room);
     }
     // drawn as sculpted figures (sculpted.js, as in the zoo), batched by part (rigs.js)
-    this.rigs = new RigRenderer(scene, this.list.length * 2 + 8);
+    this.rigs = new RigRenderer(scene, this.list.length * 2 + 100);
     this.list.forEach((h, i) => { h.seed = i + 1; h.rig = sculpted(h.type, { seed: h.seed }); h.rig.group.rotation.order = 'YXZ'; });
     this.time = 0;
   }
@@ -66,13 +67,18 @@ export class People {
     return best;
   }
 
-  // damage (the slash, quills, a pounce): blood, a stagger; dead at 0 hp
+  // damage (the slash, quills, a pounce): blood, a stagger; dead at 0 hp. A heavy killing blow (the slash, a
+  // pounce) usually takes a part off: the head, an arm or a leg flies, a stump left
   hit(h, dmg, dir) {
     if (!this.alive(h)) return;
     h.hp -= dmg;
     const p = new THREE.Vector3(h.x, 1.3, h.z), d = dir ? dir.clone().setY(0).normalize() : null;
     this.fx.burst(p, 'blood', 12, d);
-    if (h.hp <= 0) { this.kill(h); if (d) { h.x += d.x * 0.6; h.z += d.z * 0.6; h.heading = Math.atan2(d.x, d.z); } }
+    if (h.hp <= 0) {
+      this.kill(h);
+      if (dmg >= 2 && d) { const n = this.R() < 0.15 ? 0 : this.R() < 0.7 ? 1 : 2; for (let i = 0; i < n; i++) this.sever(h, d); }
+      if (d) { h.x += d.x * 0.6; h.z += d.z * 0.6; h.heading = Math.atan2(d.x, d.z); }
+    }
     else { h.stunT = Math.max(h.stunT, 0.35); this.alarm = 0; }
   }
   stun(h, t) { if (this.alive(h)) h.stunT = Math.max(h.stunT, t); }
@@ -95,6 +101,63 @@ export class People {
     this.fx.burst(new THREE.Vector3(h.x, h.y + 1.2, h.z), 'blood', 26);
     this.fx.stain(h.x, h.z, 1.1);
   }
+  // a part comes off and flies: a clone of the joint's subtree, where it was, thrown along the blow
+  sever(h, dir) {
+    const names = h.rig.cuts.filter((n) => !h.cut?.includes(n));
+    if (!names.length) return;
+    const name = names[Math.floor(this.R() * names.length)];
+    h.rig.group.position.set(h.x, h.y, h.z); h.rig.group.updateMatrixWorld(true);
+    const joint = h.rig.sever(name);
+    if (!joint) return;
+    (h.cut ||= []).push(name);
+    const piece = joint.clone(true);
+    piece.visible = true; piece.position.set(0, 0, 0); piece.rotation.set(0, 0, 0); piece.scale.set(1, 1, 1);
+    piece.traverse((o) => { if (o.name === 'cap') o.visible = true; });
+    const obj = new THREE.Group(); obj.add(piece);
+    joint.matrixWorld.decompose(obj.position, obj.quaternion, obj.scale);
+    const R = this.R, sp = 1.5 + R() * 2;
+    this.gibs.push({
+      obj, v: new THREE.Vector3(dir.x * sp + (R() - 0.5) * 1.5, 2.5 + R() * 2.5, dir.z * sp + (R() - 0.5) * 1.5),
+      w: new THREE.Vector3(R() - 0.5, R() - 0.5, R() - 0.5).normalize().multiplyScalar(6 + R() * 8), rest: false, dripT: 0, bleed: 2.5,
+    });
+    if (this.gibs.length > 80) this.gibs.shift();
+    const at = new THREE.Vector3().setFromMatrixPosition(joint.matrixWorld);
+    this.fx.burst(at, 'blood', 22, new THREE.Vector3(dir.x, 0.6, dir.z));
+    h.bleed = (h.bleed || 0) + 3; // the stump pumps for a while
+  }
+  updateGibs(dt) {
+    const g = 9.8, q = _GQ, ya = _GY, flat = _GF;
+    for (const b of this.gibs) {
+      const o = b.obj;
+      if (b.bleed > 0) b.bleed -= dt;
+      const floor = this.world.heightAt(o.position.x, o.position.z) + 0.06;
+      if (!b.rest) {
+        b.v.y -= g * dt;
+        o.position.addScaledVector(b.v, dt);
+        q.setFromAxisAngle(_GA.copy(b.w).normalize(), b.w.length() * dt); o.quaternion.premultiply(q);
+        // a trail of drops in the air
+        b.dripT -= dt;
+        if (b.dripT < 0) { b.dripT = 0.05; if (floor < 0.2) this.fx.spill?.add(o.position.x, o.position.z, 0.1, 0.04); }
+        if (o.position.y < floor) {
+          o.position.y = floor;
+          if (b.v.y < -1.5) { // a wet slap where it lands
+            if (floor < 0.2) this.fx.spill?.add(o.position.x, o.position.z, 0.22 + Math.random() * 0.12, 0.14);
+            b.v.y *= -0.28; b.v.x *= 0.55; b.v.z *= 0.55; b.w.multiplyScalar(0.5);
+          } else { b.v.y = 0; b.v.x *= 1 - Math.min(1, 7 * dt); b.v.z *= 1 - Math.min(1, 7 * dt); b.w.multiplyScalar(1 - Math.min(1, 7 * dt)); }
+          // sliding: a smear
+          if (Math.hypot(b.v.x, b.v.z) > 0.6 && floor < 0.2) this.fx.spill?.add(o.position.x, o.position.z, 0.12, 0.05);
+          if (Math.hypot(b.v.x, b.v.y, b.v.z) < 0.15) b.rest = true;
+        }
+      } else {
+        // settle lying down: turn the limb's length (its y axis) level with the floor
+        ya.set(0, 1, 0).applyQuaternion(o.quaternion);
+        flat.copy(ya).setY(0);
+        if (flat.lengthSq() > 1e-4) { q.setFromUnitVectors(ya, flat.normalize()); _GI.identity().slerp(q, Math.min(1, dt * 4)); o.quaternion.premultiply(_GI); }
+        o.position.y += (floor - o.position.y) * Math.min(1, dt * 6);
+        if (b.bleed > 0 && floor < 0.2) { b.dripT -= dt; if (b.dripT < 0) { b.dripT = 0.3; this.fx.spill?.add(o.position.x, o.position.z, 0.2, 0.05); } }
+      }
+    }
+  }
   release(h, kill = true) { h.flail = false; if (kill) this.kill(h); else h.state = 'flee'; }
   kill(h) {
     h.state = 'dead'; h.flail = false; h.fall = 0; h.deadT = 0;
@@ -113,8 +176,18 @@ export class People {
     const target = _S.set(spider.pos.x, spider.root.position.y + 0.1, spider.pos.z); // where they aim: the body
     for (const h of this.list) {
       if (h.state === 'gone') continue;
-      if (h.state === 'dead') { h.fall = Math.min(1, h.fall + dt / 0.45); h.stride = damp(h.stride, 0, 8, dt); continue; }
-      if (h.state === 'held') { h.phase += dt * 9; continue; } // the spider moves it
+      if (h.state === 'dead') {
+        h.fall = Math.min(1, h.fall + dt / 0.45); h.stride = damp(h.stride, 0, 8, dt);
+        // a body bleeds out into a pool over the first seconds (longer from a stump)
+        h.deadT = (h.deadT || 0) + dt; h.bleedT = (h.bleedT || 0) - dt;
+        if (h.deadT < 5 + (h.bleed || 0) && h.bleedT < 0) { h.bleedT = 0.25; this.fx.spill?.add(h.x + Math.sin(h.heading) * 0.5 + (R() - 0.5) * 0.3, h.z + Math.cos(h.heading) * 0.5 + (R() - 0.5) * 0.3, 0.35, 0.05); }
+        continue;
+      }
+      if (h.state === 'held') { // the spider moves it; it drips
+        h.phase += dt * 9; h.bleedT = (h.bleedT || 0) - dt;
+        if (h.bleedT < 0) { h.bleedT = 0.07; this.fx.spill?.add(h.x + (R() - 0.5) * 0.4, h.z + (R() - 0.5) * 0.4, 0.12, 0.05); }
+        continue;
+      }
       if (h.stunT > 0) { h.stunT -= dt; h.aim = damp(h.aim, 0, 10, dt); h.stride = damp(h.stride, 0, 10, dt); h.burst = 0; continue; } // reeling
       const T = h.T, j = nav.index(h.x, h.z);
       const walkDist = j >= 0 ? maps.toSpider[j] * nav.cell : 1e9;
@@ -205,6 +278,9 @@ export class People {
       }
       this.rigs.add(r.group);
     }
+    // severed parts
+    this.updateGibs(dt);
+    for (const b of this.gibs) if (Math.abs(b.obj.position.x - spider.pos.x) < 46 && Math.abs(b.obj.position.z - spider.pos.z) < 34) this.rigs.add(b.obj);
     this.rigs.end();
   }
 
@@ -242,4 +318,5 @@ export class People {
   }
 }
 
+const _GQ = new THREE.Quaternion(), _GI = new THREE.Quaternion(), _GY = new THREE.Vector3(), _GF = new THREE.Vector3(), _GA = new THREE.Vector3();
 const _LA = new THREE.Vector3(), _LB = new THREE.Vector3(), _LD = new THREE.Vector3(), _S = new THREE.Vector3(), _G = new THREE.Vector3(), _A = new THREE.Vector3(), _M = new THREE.Vector3(), _E = new THREE.Vector3(), _D = new THREE.Vector3();

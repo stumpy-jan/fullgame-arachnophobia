@@ -10,6 +10,7 @@ import { Post, postParams } from './post.js';
 import { softDot } from './textures.js';
 import { damp, clamp } from './util.js';
 import { FX } from './fx.js';
+import { Spill } from './spill.js';
 import { People } from './people/people.js';
 import { Hud } from './hud.js';
 import { sfx, falloff, audioOpts } from './audio.js';
@@ -58,6 +59,9 @@ if (Q.get('at')) { const [x, z, h] = Q.get('at').split(',').map(Number); spider.
 
 // the people (?nopeople: an empty lab), effects, the game's state
 const fx = new FX(scene);
+// liquids on the floor: blood, specimen fluid, oil (spill.js); everything that bleeds or breaks adds to it
+const spill = new Spill(renderer, lab);
+fx.spill = spill;
 const people = Q.has('nopeople') || GYM ? null : new People(scene, lab, spider, fx);
 const state = { hp: 100, kills: 0, over: false, hurt: 0, log: [] };
 const hud = new Hud();
@@ -90,6 +94,7 @@ const EYE = Q.get('eye') && Q.get('eye').split(',').map(Number), LOOK = Q.get('l
 if (Q.has('hide')) spider.root.parent.traverse((o) => { if (o.isMesh && (o.parent === spider.root || spider.root.children.includes(o.parent) || o.material?.map === spider.legs[0].femur.material.map)) o.visible = false; });
 function updateCamera(dt, t) {
   if (EYE) { camera.position.set(...EYE); camera.lookAt(...LOOK); return; }
+  if (window.__eye) { const E = window.__eye; camera.position.set(E[0], E[1], E[2]); camera.lookAt(E[3], E[4], E[5]); return; } // (tools: a camera set from outside)
   const lead = new THREE.Vector3(spider.vel.x * 0.45, 0, spider.vel.z * 0.45);
   camTarget.x = damp(camTarget.x, spider.pos.x + lead.x, 3.5, dt);
   camTarget.z = damp(camTarget.z, spider.pos.z + lead.z, 3.5, dt);
@@ -177,7 +182,8 @@ function hitLock(L, d) {
   L.lamp.material.color.setRGB(0.02, 0.02, 0.02); L.light.intensity = 0;
   L.group.rotation.z = 0.05;
   for (let i = 0; i < 4; i++) fx.burst(new THREE.Vector3(L.x, L.h * 0.6, L.z), 'spark', 30);
-  fx.stain(L.x, L.z, 2.2);
+  // its fluids out across the floor: the pumps' hydraulic oil (a lot), the generator's (a little)
+  spill.add(L.x, L.z, L.kind === 'pumps' ? 2.4 : 1.4, 0, 0, L.kind === 'pumps' ? 3 : 1.2);
   shake = 1.4; hitStop = 0.08;
   sfx('boom');
   if (lab.locks.every((o) => o.destroyed) && lab.door) { lab.door.unlocked = true; hud.notice('THE DOOR IS OPEN'); sfx('door'); }
@@ -203,13 +209,26 @@ function updateGoal(dt) {
   }
 }
 
+// footprints: a foot that steps in a pool soaks some up and prints it on the next few steps (spill.js)
+const feetWet = new Map();
+function footprint(e) {
+  if (e.pos.y > 0.25) return; // (on a bench or a wall top: the spill only covers the floor)
+  const key = e.k * 2 + (e.s > 0 ? 1 : 0), w = feetWet.get(key) || [0, 0], [b, i] = spill.wetAt(e.pos.x, e.pos.z);
+  if (b > 0.12 || i > 0.12) { w[0] = Math.min(1, w[0] + (b > 0.12 ? 0.7 : 0)); w[1] = Math.min(1, w[1] + (i > 0.12 ? 0.7 : 0)); }
+  else if (w[0] + w[1] > 0.04) { spill.add(e.pos.x, e.pos.z, 0.2, w[0] * 0.2, w[1] * 0.2); w[0] *= 0.8; w[1] *= 0.8; }
+  feetWet.set(key, w);
+}
+
 // a vat breaks when the spider crashes into it: glass everywhere, and a mutation to choose
 function breakVat(b) {
   b.broken = true;
   for (const m of b.parts) m.visible = false;
   b.light.intensity = 2;
   const p = new THREE.Vector3(b.x, 1.2, b.z);
-  fx.burst(p, 'spark', 30); fx.burst(p, 'ichor', 24); fx.stain(b.x, b.z, 1.6);
+  fx.burst(p, 'spark', 30); fx.burst(p, 'ichor', 24);
+  // the vat empties across the floor
+  spill.add(b.x, b.z, 1.8, 0, 4);
+  for (let i = 0; i < 5; i++) { const a = Math.random() * 6.28, r = 1 + Math.random() * 1.2; spill.add(b.x + Math.cos(a) * r, b.z + Math.sin(a) * r, 0.5 + Math.random() * 0.4, 0, 0.6); }
   shake = Math.min(1, shake + 0.5);
   sfx('glass');
   const offer = mutations.offer(3);
@@ -246,7 +265,7 @@ function frame(now) {
       mutations.update(dt, ctx);
     }
     for (const e of spider.events) {
-      if (e.type === 'step') { shake = Math.min(0.6, shake + 0.06); sfx('step', 0.6); }
+      if (e.type === 'step') { shake = Math.min(0.6, shake + 0.06); sfx('step', 0.6); footprint(e); }
       if (e.type === 'slash') { shake = Math.min(1, shake + 0.22); hitStop = 0.035; sfx('slash'); }
       if (e.type === 'impale') { shake = Math.min(1, shake + 0.4); hitStop = 0.06; sfx('slash'); sfx('squelch'); state.log.push(['impale', +time.toFixed(2)]); }
       if (e.type === 'eat') { state.hp = Math.min(100, state.hp + 30); sfx('squelch'); }
@@ -263,6 +282,7 @@ function frame(now) {
       people.update(dt, time);
       for (const e of people.events) {
         if (e.type === 'shot') sfx('shot', falloff(e.from.x, e.from.z, spider.pos.x, spider.pos.z));
+        if (e.type === 'shot' && e.hit) fx.burst(new THREE.Vector3(e.to.x, e.to.y, e.to.z), 'ichor', 4, new THREE.Vector3(0, 0.5, 0)); // the spider bleeds its own pink
         if (e.type === 'shot' && e.hit && !state.over && !Q.has('god')) { state.hp -= e.damage; state.hurt = 1; state.lastHurt = time; shake = Math.min(0.8, shake + 0.08); }
       }
       state.kills = people.list.filter((h) => h.state === 'dead' || h.state === 'gone').length;
@@ -271,6 +291,7 @@ function frame(now) {
     // slow regeneration while not taking damage
     if (time - (state.lastHurt ?? -9) > 3) state.hp = Math.min(100, state.hp + 2.5 * dt);
     fx.update(dt);
+    spill.update(dt);
   }
   // hurt: a red pulse in the post pass
   state.hurt = Math.max(0, state.hurt - real * 4);
@@ -292,4 +313,4 @@ updateCamera(1, 0);
 requestAnimationFrame(frame);
 
 // for tools and the console
-window.game = { seed: SEED, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };
+window.game = { seed: SEED, spill, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };

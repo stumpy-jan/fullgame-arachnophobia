@@ -48,6 +48,11 @@ URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` 
   plays that headless: tears down every lock, walks out, screenshots each step to shots/goal_*.png.
 - `src/audio.js`: every sound is synthesised in Web Audio (footsteps, slash, impale, gunfire by distance, glass,
   metal, explosions, the door, quills) over a low facility hum and a far siren. It starts on the first key or click.
+- `src/spill.js`: liquids on the floor, the whole level at once: a GPU texture (12.5 cm a texel) of blood,
+  specimen fluid and oil, splatted into, flowing (excess over a thin film runs to neighbours; walls and props
+  block it; a fixed floor bumpiness makes pools spread in lobes), drying to stains. The floor shaders read it.
+- Gore: `people.sever` cuts a part off a sculpted rig (`rig.sever`: a stump shows) and throws a clone of it as a
+  gib (`updateGibs`: bounces, bleeds, settles lying flat).
 - `src/fx.js`: pooled tracers, muzzle flashes, sparks, ichor, blood and floor stains.
 - The impale (`spider.strike`): each free leg rises over the nearest person in reach, stabs down (hit-stop,
   camera kick), carries them to the fangs and feeds (+8 health); then steps back down onto a foothold.

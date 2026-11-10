@@ -83,7 +83,12 @@ Sprinter, Leaper. Glands: Acid trail, Web trail.
 - Destructibility: glass (tanks, screens, windows) shatters as you push through; vats spill.
 - Battle damage accumulates: bullet holes and scorch marks on walls, spent casings on the floor.
 - Killing people dismembers them into bloody pieces; a floor-wide liquid spill system for blood, fluids and
-  drag trails.
+  drag trails. **Built:** a heavy killing blow (the slash, a pounce) takes off a head, an arm or a leg (a wet
+  stump left, the part flying, bouncing and bleeding where it lands). Liquids are simulated over the whole floor
+  (`src/spill.js`): blood, the vats' pink specimen fluid (also the spider's own blood) and hydraulic oil spread
+  round props and stop at walls; blood dries to a dark stain. Sources: spatter from every wound, corpses
+  bleeding out into pools, drips from someone being carried, broken vats, wrecked locks (oil). The spider prints
+  footprints after stepping in a pool. Still to do: bullet holes, casings, glass shards.
 - The monster doesn't grow much: it changes through its mutations (modular, swappable parts).
 
 ## Open questions

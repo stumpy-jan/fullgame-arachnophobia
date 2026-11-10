@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { makeCanvas, fbm, rng, canvasTexture } from '../util.js';
 import { normalFromHeight } from '../textures.js';
+import { spillShader } from '../spill.js';
 
 // Floors by room type. Photo-scanned CC0 sets (Poly Haven, see CREDITS.md) at their real size, sampled
 // with a no-tile shader so a 2.5 m texture never shows its grid; the server room is a raised access floor
@@ -84,6 +85,7 @@ export function noTile(material) {
       .replace('#include <roughnessmap_fragment>', chunk('roughnessmap_fragment') + `
         roughnessFactor = clamp(roughnessFactor * (0.85 + 0.3 * ntNoise(vNtWorld.xz * 0.2 + 17.0)), 0.04, 1.0);`)
       .replace('#include <normal_fragment_maps>', chunk('normal_fragment_maps'));
+    spillShader(sh); // liquids on the floor (spill.js)
   };
   material.customProgramCacheKey = () => 'notile';
 }
@@ -119,5 +121,7 @@ function raisedFloorMaterial() {
   const rep = 1 / (N * 0.6);
   const tex = [canvasTexture(c), canvasTexture(ce), normalFromHeight(h, S, S, 2)];
   for (const t of tex) t.repeat.set(rep, rep);
-  return new THREE.MeshStandardMaterial({ map: tex[0], emissiveMap: tex[1], emissive: 0xffffff, emissiveIntensity: 1.5, normalMap: tex[2], roughness: 0.5, metalness: 0.15 });
+  const m = new THREE.MeshStandardMaterial({ map: tex[0], emissiveMap: tex[1], emissive: 0xffffff, emissiveIntensity: 1.5, normalMap: tex[2], roughness: 0.5, metalness: 0.15 });
+  m.onBeforeCompile = spillShader; m.customProgramCacheKey = () => 'raised-spill';
+  return m;
 }
