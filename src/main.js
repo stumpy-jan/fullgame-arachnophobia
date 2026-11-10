@@ -47,7 +47,7 @@ const dust = (() => {
 
 // camera: high and steep, a little behind (south of) the spider, leading where it's going
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.5, 200);
-const CAM = { height: 27, back: 15 };
+const CAM = { height: 34, back: 17 };
 if (Q.get('cam')) { const [h, b] = Q.get('cam').split(',').map(Number); CAM.height = h; CAM.back = b; }
 const camTarget = new THREE.Vector3().copy(spider.pos);
 let shake = 0;

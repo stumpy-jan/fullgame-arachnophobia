@@ -167,32 +167,19 @@ export function legTexture() {
   return canvasTexture(c);
 }
 
-// The abdomen: bruised chitin with glowing veins. Returns { map, emissive } (equirectangular, for a sphere).
-export function abdomenTextures() {
-  const W = 1024, H = 512, R = rng(61);
-  const n = fbm(W, H, 6, 5, 62);
-  const [c, g] = makeCanvas(W, H), [ce, ge] = makeCanvas(W, H);
+// The abdomen: dark mottled chitin with a faint paler fleck (equirectangular, for a sphere). Also its bump.
+export function abdomenTexture() {
+  const W = 512, H = 256;
+  const n = fbm(W, H, 8, 5, 62), f = fbm(W, H, 48, 2, 63);
+  const [c, g] = makeCanvas(W, H);
   const img = g.createImageData(W, H);
   for (let i = 0; i < W * H; i++) {
-    const v = n[i];
-    img.data[i * 4] = 26 + v * 40; img.data[i * 4 + 1] = 14 + v * 14; img.data[i * 4 + 2] = 22 + v * 26; img.data[i * 4 + 3] = 255;
+    const fleck = Math.max(0, f[i] - 0.62) * 3;
+    const v = 0.7 + n[i] * 0.5 + fleck * 0.8;
+    img.data[i * 4] = 30 * v; img.data[i * 4 + 1] = 21 * v; img.data[i * 4 + 2] = 22 * v; img.data[i * 4 + 3] = 255;
   }
   g.putImageData(img, 0, 0);
-  ge.fillStyle = '#000'; ge.fillRect(0, 0, W, H);
-  // veins: wandering branching lines, mostly along the length (u)
-  const vein = (x, y, a, w, depth) => {
-    for (let s = 0; s < 40 && w > 0.4; s++) {
-      const nx = x + Math.cos(a) * 9, ny = y + Math.sin(a) * 9;
-      for (const [ctx, col, ww] of [[g, 'rgba(90,150,40,0.55)', w * 1.6], [ge, 'rgba(150,255,60,0.9)', w]]) {
-        ctx.strokeStyle = col; ctx.lineWidth = ww; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
-      }
-      x = nx; y = ny; a += (R() - 0.5) * 0.7; w *= 0.965;
-      if (depth < 3 && R() < 0.08) vein(x, y, a + (R() < 0.5 ? 0.9 : -0.9), w * 0.7, depth + 1);
-    }
-  };
-  for (let i = 0; i < 26; i++) vein(R() * W, 120 + R() * 280, (R() < 0.5 ? 0 : Math.PI) + (R() - 0.5) * 0.6, 3 + R() * 3, 0);
-  ge.filter = 'blur(3px)'; ge.drawImage(ce, 0, 0); ge.filter = 'none';
-  return { map: canvasTexture(c), emissive: canvasTexture(ce) };
+  return canvasTexture(c);
 }
 
 // A soft round sprite for dust and glows.

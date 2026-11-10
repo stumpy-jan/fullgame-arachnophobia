@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clamp, damp, angleTo, rng } from './util.js';
-import { legTexture, abdomenTextures } from './textures.js';
+import { legTexture, abdomenTexture } from './textures.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // The specimen: a car-sized spider, animated entirely in code.
@@ -19,7 +19,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quatern
 export const spiderParams = {
   walk: 6.5, sprint: 12, accel: 5, turn: 4.2,
   ride: 2.0,         // body height above the average foot
-  clearance: 1.15,   // ... and above anything under the body
+  clearance: 0.95,   // ... and above anything under the body
   lead: 0.32,        // s of velocity a foot steps ahead
   stepAt: 1.25,      // m a foot may lag before it steps
   stepTime: 0.26,    // s per step at a walk (shorter when fast)
@@ -50,11 +50,10 @@ export class Spider {
     const chitin = new THREE.MeshPhysicalMaterial({ color: 0x1c1418, roughness: 0.5, metalness: 0.05, clearcoat: 0.5, clearcoatRoughness: 0.3, sheen: 0.6, sheenColor: 0x4a3024, sheenRoughness: 0.5 });
     const legTex = legTexture();
     const legMat = new THREE.MeshPhysicalMaterial({ map: legTex, bumpMap: legTex, bumpScale: 3, roughness: 0.5, metalness: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.3, sheen: 0.6, sheenColor: 0x4a3024, sheenRoughness: 0.45 });
-    const ab = abdomenTextures();
-    this.abMat = new THREE.MeshPhysicalMaterial({ map: ab.map, emissiveMap: ab.emissive, emissive: 0x9cff4a, emissiveIntensity: 1.0, roughness: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.25, sheen: 0.5, sheenColor: 0x40242a, sheenRoughness: 0.5 });
+    const abTex = abdomenTexture();
+    this.abMat = new THREE.MeshPhysicalMaterial({ map: abTex, bumpMap: abTex, bumpScale: 2, roughness: 0.5, clearcoat: 0.55, clearcoatRoughness: 0.28, sheen: 0.6, sheenColor: 0x4a3024, sheenRoughness: 0.5 });
     // glossy black beads with a red glow deep in them
     const eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x050203, emissive: 0xff2208, emissiveIntensity: 1.6, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05 });
-    this.pustuleMat = new THREE.MeshStandardMaterial({ color: 0x8aa040, emissive: 0xc8ff50, emissiveIntensity: 1.6, roughness: 0.15 });
     const add = (parent, geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x, y, z); m.scale.set(sx, sy, sz);
@@ -65,63 +64,57 @@ export class Spider {
     const sphere = new THREE.SphereGeometry(1, 40, 28);
     const lump = (amp, freq, seed) => lumpy(new THREE.SphereGeometry(1, 64, 48), amp, freq, seed);
 
-    // cephalothorax (forward is +z)
-    this.thorax = add(this.root, lump(0.05, 4, 1), chitin, 0, 0, 0.35, 1.05, 0.56, 1.2);
-    add(this.root, lump(0.06, 5, 2), chitin, 0, 0.32, 0.45, 0.62, 0.32, 0.8); // the raised carapace hump
+    // cephalothorax (forward is +z): lean and low
+    this.thorax = add(this.root, lump(0.05, 4, 1), chitin, 0, 0, 0.25, 0.72, 0.4, 0.88);
+    add(this.root, lump(0.06, 5, 2), chitin, 0, 0.22, 0.32, 0.44, 0.24, 0.6); // the raised carapace hump
     // eyes: two big, six small, in a cluster at the front of the carapace
-    const eyes = [[0.13, 0.36, 1.45, 0.1], [-0.13, 0.36, 1.45, 0.1], [0.34, 0.33, 1.33, 0.055], [-0.34, 0.33, 1.33, 0.055],
-      [0.08, 0.5, 1.3, 0.05], [-0.08, 0.5, 1.3, 0.05], [0.26, 0.47, 1.17, 0.04], [-0.26, 0.47, 1.17, 0.04]];
+    const eyes = [[0.09, 0.27, 1.08, 0.075], [-0.09, 0.27, 1.08, 0.075], [0.24, 0.24, 0.99, 0.042], [-0.24, 0.24, 0.99, 0.042],
+      [0.06, 0.37, 0.97, 0.038], [-0.06, 0.37, 0.97, 0.038], [0.18, 0.34, 0.87, 0.03], [-0.18, 0.34, 0.87, 0.03]];
     for (const [x, y, z, r] of eyes) add(this.root, sphere, eyeMat, x, y, z, r, r, r).castShadow = false;
     // chelicerae and fangs
     this.fangs = [];
     for (const s of [-1, 1]) {
       const g = new THREE.Group();
-      g.position.set(s * 0.28, -0.05, 1.42);
+      g.position.set(s * 0.19, -0.05, 1.05);
       this.root.add(g);
-      add(g, sphere, chitin, 0, -0.15, 0.15, 0.24, 0.4, 0.28);
-      const fang = add(g, new THREE.ConeGeometry(0.09, 0.6, 10), legMat, 0, -0.55, 0.28);
+      add(g, sphere, chitin, 0, -0.1, 0.1, 0.16, 0.28, 0.19);
+      const fang = add(g, new THREE.ConeGeometry(0.06, 0.42, 10), legMat, 0, -0.4, 0.2);
       fang.rotation.x = 0.5;
       this.fangs.push(g);
     }
-    // the abdomen hangs off a pivot behind the thorax
+    // the abdomen: small and tight, hanging off a pivot behind the thorax
     this.abPivot = new THREE.Group();
-    this.abPivot.position.set(0, 0.15, -0.75);
+    this.abPivot.position.set(0, 0.1, -0.6);
     this.root.add(this.abPivot);
-    add(this.abPivot, sphere, chitin, 0, 0.05, -0.35, 0.5, 0.42, 0.5); // pedicel
-    this.abdomen = add(this.abPivot, lump(0.07, 3.2, 5), this.abMat, 0, 0.35, -2.05, 1.5, 1.2, 1.95);
-    this.abdomen.rotation.x = -0.12;
-    // pustules: glowing sacs on the upper abdomen
-    for (let i = 0; i < 14; i++) {
-      const u = R() * Math.PI * 2, v = 0.15 + R() * 0.75;
-      const x = Math.cos(u) * Math.sin(v * 1.4), y = Math.cos(v * 1.4), z = Math.sin(u) * Math.sin(v * 1.4);
-      const r = 0.05 + R() * R() * 0.14;
-      add(this.abPivot, sphere, this.pustuleMat, x * 1.47, 0.35 + y * 1.18, -2.05 + z * 1.92, r, r * 0.6, r);
-    }
+    add(this.abPivot, sphere, chitin, 0, 0.03, -0.2, 0.3, 0.26, 0.32); // pedicel
+    this.abdomen = add(this.abPivot, lump(0.05, 4, 5), this.abMat, 0, 0.18, -1.15, 0.78, 0.62, 1.05);
+    this.abdomen.rotation.x = -0.15;
+    this.abBase = this.abdomen.scale.clone();
     // spinnerets
-    add(this.abPivot, new THREE.ConeGeometry(0.18, 0.4, 10), chitin, 0, 0.0, -3.95).rotation.x = -Math.PI / 2 - 0.4;
+    add(this.abPivot, new THREE.ConeGeometry(0.1, 0.26, 10), chitin, 0, 0.05, -2.2).rotation.x = -Math.PI / 2 - 0.4;
 
     // legs
     // segments are built at their real length (y = 0 .. len) with spines baked in; seg() scales y only
     // when the IK has to stretch or squash one
     // lathed profiles (radius along the length): a thick base, a waist, a swelling before the next joint
-    const femurGeo = spiny(lathe(FEMUR, [[0, 0.26], [0.06, 0.31], [0.25, 0.29], [0.55, 0.24], [0.8, 0.22], [0.93, 0.25], [1, 0.18]]), FEMUR, 0.26, 34, R);
-    const tibiaGeo = spiny(lathe(TIBIA, [[0, 0.2], [0.07, 0.23], [0.3, 0.19], [0.65, 0.14], [0.9, 0.11], [1, 0.09]]), TIBIA, 0.17, 30, R);
-    const clawGeo = new THREE.ConeGeometry(0.1, CLAW, 10).translate(0, -CLAW / 2, 0).rotateX(Math.PI); // tip at the origin, base at +y
+    const femurGeo = spiny(lathe(FEMUR, [[0, 0.15], [0.06, 0.18], [0.25, 0.17], [0.55, 0.14], [0.8, 0.125], [0.93, 0.145], [1, 0.1]]), FEMUR, 0.15, 30, R);
+    const tibiaGeo = spiny(lathe(TIBIA, [[0, 0.115], [0.07, 0.13], [0.3, 0.11], [0.65, 0.08], [0.9, 0.062], [1, 0.05]]), TIBIA, 0.1, 26, R);
+    const clawGeo = new THREE.ConeGeometry(0.055, CLAW, 10).translate(0, -CLAW / 2, 0).rotateX(Math.PI); // tip at the origin, base at +y
     const angles = [38, 72, 108, 145].map((d) => (d * Math.PI) / 180);
     const reach = [4.6, 4.3, 4.3, 4.8];
     for (let k = 0; k < 4; k++) {
       for (const s of [-1, 1]) {
         const leg = {
           s, k,
-          hip: new THREE.Vector3(s * 0.75, -0.05, 0.95 - k * 0.42),
+          hip: new THREE.Vector3(s * 0.52, -0.04, 0.68 - k * 0.3),
           rest: new THREE.Vector3(s * Math.sin(angles[k]) * reach[k], 0, Math.cos(angles[k]) * reach[k]),
           foot: new THREE.Vector3(), from: new THREE.Vector3(), target: new THREE.Vector3(),
           stepping: false, t: 0, dur: 0.25, peak: 0, lastStep: 0,
         };
         const mk = (geo) => { const m = new THREE.Mesh(geo, legMat); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; };
         leg.femur = mk(femurGeo); leg.tibia = mk(tibiaGeo); leg.claw = mk(clawGeo);
-        leg.knee = mk(sphere); leg.knee.scale.setScalar(0.2);
-        leg.hipBall = mk(sphere); leg.hipBall.scale.setScalar(0.3);
+        leg.knee = mk(sphere); leg.knee.scale.setScalar(0.125);
+        leg.hipBall = mk(sphere); leg.hipBall.scale.setScalar(0.18);
         leg.femur.userData.len = FEMUR; leg.tibia.userData.len = TIBIA; leg.claw.userData.len = CLAW;
         this.legs.push(leg);
       }
@@ -168,9 +161,9 @@ export class Spider {
     }
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
-    // the walls push on the thorax and on the abdomen trailing behind it
+    // only the lab's outer walls hold it in (on the thorax and the abdomen behind it); it climbs over the rest
     for (let it = 0; it < 2; it++) {
-      for (const [off, r] of [[0.4, 1.5], [-2.7, 1.5]]) {
+      for (const [off, r] of [[0.3, 1.1], [-1.6, 0.9]]) {
         const ox = this.pos.x + Math.sin(this.heading) * off, oz = this.pos.z + Math.cos(this.heading) * off;
         _v.set(ox, 0, oz);
         this.world.collide(_v, r);
@@ -220,10 +213,15 @@ export class Spider {
     }
 
     // --- body: height, bob, tilt
+    // the body always clears what is under it: sample its footprint (thorax to abdomen tip), both where it
+    // is and where it will be in a moment, so it rises onto a wall before it gets there
     let under = 0;
-    for (const [ox, oz] of [[0, 0], [1, 0], [-1, 0], [0, 1.4], [0, -1.6], [0, -3]]) {
-      const c = Math.cos(this.heading), s = Math.sin(this.heading);
-      under = Math.max(under, this.world.heightAt(this.pos.x + ox * c + oz * s, this.pos.z - ox * s + oz * c));
+    const c = Math.cos(this.heading), s = Math.sin(this.heading);
+    for (const look of [0, 0.3, 0.6]) {
+      const bx = this.pos.x + this.vel.x * look, bz = this.pos.z + this.vel.z * look;
+      for (const [ox, oz] of [[0, 0], [0.65, 0], [-0.65, 0], [0, 1.1], [0, -0.8], [0, -1.6], [0, -2.3]]) {
+        under = Math.max(under, this.world.heightAt(bx + ox * c + oz * s, bz - ox * s + oz * c));
+      }
     }
     const wantY = Math.max(this.avgFootY() + P.ride, under + P.clearance);
     this.pos.y = damp(this.pos.y, wantY, 7, dt);
@@ -251,9 +249,7 @@ export class Spider {
     sw.y = damp(sw.y, clamp(-aSide * 0.02, -0.35, 0.35), 4, dt);
     sw.x = damp(sw.x, clamp(aFwd * 0.015 + this.bob * 0.4, -0.3, 0.3), 5, dt);
     const br = 1 + Math.sin(this.time * 1.7) * 0.025;
-    this.abdomen.scale.set(1.5 * br, 1.2 * br, 1.95);
-    this.abMat.emissiveIntensity = 0.45 + Math.sin(this.time * 2.3) * 0.2 + fast * 0.4;
-    this.pustuleMat.emissiveIntensity = 0.8 + Math.sin(this.time * 3.1 + 1) * 0.4;
+    this.abdomen.scale.set(this.abBase.x * br, this.abBase.y * br, this.abBase.z);
     for (const [i, f] of this.fangs.entries()) f.rotation.x = Math.sin(this.time * 6 + i * 2.1) * 0.12 * (0.4 + fast);
 
     // --- legs: IK and meshes
@@ -314,8 +310,8 @@ function spiny(geo, len, radius, n, R) {
   const parts = [geo];
   for (let i = 0; i < n; i++) {
     const f = 0.12 + R() * 0.8, a = (R() - 0.5) * Math.PI * 1.6; // around the segment, biased to one side
-    const L = 0.18 + R() * R() * 0.45;
-    const c = new THREE.ConeGeometry(0.018 + L * 0.03, L, 4).translate(0, L / 2, 0);
+    const L = 0.12 + R() * R() * 0.32;
+    const c = new THREE.ConeGeometry(0.012 + L * 0.02, L, 4).translate(0, L / 2, 0);
     c.rotateZ(-1.0 - R() * 0.3);                       // lean out from the segment ...
     c.rotateY(a);                                       // ... on some side of it
     c.translate(Math.cos(a) * radius * 0.9, f * len, -Math.sin(a) * radius * 0.9);

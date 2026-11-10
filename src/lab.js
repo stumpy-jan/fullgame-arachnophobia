@@ -13,7 +13,7 @@ import * as TX from './textures.js';
 //                  |                         |  storage
 
 export const WALL_H = 3.4;
-const WALL_T = 0.35;
+const WALL_T = 1.2; // thick enough for the spider to plant its feet on
 
 // an irregular blob outline (unit radius, `rough` = how ragged), flat in xy
 function splat(R, r, rough) {
@@ -31,7 +31,7 @@ export function buildLab(scene) {
   const root = new THREE.Group();
   scene.add(root);
   const solids = [];
-  const box = (x0, x1, z0, z1, top, wall = false) => solids.push({ x0, x1, z0, z1, top, wall });
+  const box = (x0, x1, z0, z1, top, wall = false, outer = false) => solids.push({ x0, x1, z0, z1, top, wall, outer });
   const disc = (cx, cz, r, top) => solids.push({ cx, cz, r, top });
 
   // ---------------------------------------------------------------- materials
@@ -44,7 +44,7 @@ export function buildLab(scene) {
   const M = {
     floor: new THREE.MeshStandardMaterial({ map: floorT.map, roughnessMap: floorT.rough, roughness: 1, metalness: 0 }),
     wall: new THREE.MeshStandardMaterial({ map: wallT, roughness: 0.62, metalness: 0.15 }),
-    wallTop: new THREE.MeshStandardMaterial({ color: 0x23272a, map: grime, roughness: 0.8 }),
+    wallTop: new THREE.MeshStandardMaterial({ color: 0x3a4044, map: grime, roughness: 0.8 }),
     cabinet: new THREE.MeshStandardMaterial({ color: 0x8f9aa0, map: grime, roughness: 0.5, metalness: 0.35 }),
     benchTop: new THREE.MeshStandardMaterial({ color: 0x141618, roughness: 0.22, metalness: 0.05 }),
     steel: new THREE.MeshStandardMaterial({ color: 0x9aa3a8, map: grime, roughness: 0.38, metalness: 0.85 }),
@@ -91,7 +91,7 @@ export function buildLab(scene) {
   outer.rotation.x = -Math.PI / 2;
 
   // ---------------------------------------------------------------- walls
-  const wall = (x0, z0, x1, z1) => {
+  const wall = (x0, z0, x1, z1, outer = false) => {
     const horiz = Math.abs(z1 - z0) < 0.01;
     const w = horiz ? Math.abs(x1 - x0) + WALL_T : WALL_T, d = horiz ? WALL_T : Math.abs(z1 - z0) + WALL_T;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -102,10 +102,10 @@ export function buildLab(scene) {
     m.position.set(cx, WALL_H / 2, cz);
     m.castShadow = m.receiveShadow = true;
     root.add(m);
-    box(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, WALL_H, true);
+    box(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, WALL_H, true, outer);
   };
   // outer shell
-  wall(-32, -22, 32, -22); wall(-32, 22, 32, 22); wall(-32, -22, -32, 22); wall(32, -22, 32, 22);
+  wall(-32, -22, 32, -22, true); wall(-32, 22, 32, 22, true); wall(-32, -22, -32, 22, true); wall(32, -22, 32, 22, true);
   // partitions (doorways are the gaps)
   wall(-10, -22, -10, -4); wall(-10, 4, -10, 22);
   wall(10, -22, 10, -7); wall(10, 1, 10, 22);
@@ -239,7 +239,7 @@ export function buildLab(scene) {
 
   // wet lab (top left)
   for (const z of [-17, -11, -5]) { bench(-26, z, 6); bench(-15.5, z, 6); }
-  for (let x = -30; x < -12; x += 3.2) block(x, -21, 2.6, 2.3, 1.2, M.cabinet); // fume hoods on the north wall
+  for (let x = -30; x < -12; x += 3.2) block(x, -20.4, 2.6, 2.3, 1.2, M.cabinet); // fume hoods on the north wall
 
   // server room (bottom left)
   rackRow(-27, 4, 15, 1); rackRow(-22, 4, 15, -1); rackRow(-17, 4, 15, 1);
@@ -308,10 +308,10 @@ export function buildLab(scene) {
     }
     return h;
   }
-  // push a circle (the spider's body) out of the walls
+  // push a circle (the spider's body) back inside the outer walls
   function collide(p, r) {
     for (const s of solids) {
-      if (!s.wall) continue;
+      if (!s.outer) continue; // only the outer shell holds it in: it climbs over the partitions
       const cx = Math.max(s.x0, Math.min(p.x, s.x1)), cz = Math.max(s.z0, Math.min(p.z, s.z1));
       const dx = p.x - cx, dz = p.z - cz, d2 = dx * dx + dz * dz;
       if (d2 < r * r) {
@@ -335,10 +335,9 @@ export function buildLab(scene) {
     for (const s of screens) s.material.color.setScalar(1.8 + Math.sin(t * 30 + s.id) * 0.1);
   }
 
-  // the autopilot's tour: through every room
+  // the autopilot's tour: straight over the partition walls, through every room
   const route = [
-    [0, 6], [0, 14], [-6, 8], [-13, 0], [-21, -3], [-21, -8], [-26, -14], [-15, -14], [-21, -2], [-21, 4],
-    [-24.5, 12], [-19.5, 18], [-14, 10], [-6, 3], [6, -3], [15, -3], [21, -9], [21, 3], [21, 9], [18, 16], [26, 14], [12, 0], [3, -8],
+    [0, 6], [-14, 10], [-14, -12], [-26, -12], [-26, 12], [0, 16], [27, 16], [27, -12], [0, -16], [0, 4],
   ].map(([x, z]) => new THREE.Vector2(x, z));
 
   return { root, heightAt, collide, update, route, spawn: { x: 0, z: 2.5, heading: 0 } };
