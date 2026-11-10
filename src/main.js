@@ -12,6 +12,7 @@ const Q = new URLSearchParams(location.search);
 const SHOT = Q.has('shot');
 if (SHOT) document.documentElement.classList.add('shot');
 if (Q.has('nopost')) postParams.on = false;
+if (Q.has('noao')) postParams.ao = false;
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: SHOT });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -62,7 +63,7 @@ function updateCamera(dt, t) {
   camera.lookAt(camTarget.x + sx * 0.5, camTarget.y, camTarget.z + sz * 0.5);
 }
 
-const post = new Post(renderer);
+const post = new Post(renderer, scene, camera);
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -76,6 +77,7 @@ addEventListener('keydown', (e) => {
   keys.add(e.code);
   if (e.code === 'KeyP') auto = !auto;
   if (e.code === 'Digit1') postParams.on = !postParams.on;
+  if (e.code === 'Digit2') postParams.ao = !postParams.ao;
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
@@ -117,4 +119,4 @@ updateCamera(1, 0);
 requestAnimationFrame(frame);
 
 // for tools and the console
-window.game = { spider, lab, camera, postParams, CAM, renderer, get time() { return time; } };
+window.game = { spider, lab, camera, postParams, CAM, renderer, post, get time() { return time; } };

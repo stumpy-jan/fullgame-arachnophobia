@@ -1,12 +1,19 @@
 import * as THREE from 'three';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 
 // After Skyward's post pass (Paolo): the scene goes to an HDR target, a quarter- and a sixteenth-res
 // Gaussian blur of it make a soft haze and a two-level bloom, then a composite adds chromatic fringing
 // at the edges, a vignette, tone mapping, a gradient map in colour-blend mode, fine animated grain and
-// a dither so the dark gradients don't band.
+// a dither so the dark gradients don't band. Before all that, ground-truth ambient occlusion (three's
+// GTAOPass: its own normal/depth pass, the AO, a Poisson denoise) darkens the scene where surfaces meet:
+// under the spider, along wall feet, between props. Key 2 toggles it; ?noao starts with it off.
 
 export const postParams = {
   on: true,
+  ao: true,
+  aoIntensity: 1.0,  // 0..1 blend of the AO into the image
+  aoRadius: 2.6,     // m: how far the darkening reaches
+  aoScale: 3.6,      // strength
   haze: 0.22,        // share of the blurred image mixed back in
   glow: 0.55,        // bloom strength
   threshold: 0.75,   // bloom threshold (linear HDR)
@@ -20,9 +27,14 @@ const VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position =
 const hex = (v, h) => { const n = parseInt(h.slice(1), 16); return v.set(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
 
 export class Post {
-  constructor(renderer) {
+  constructor(renderer, scene, camera) {
     this.renderer = renderer;
     const hdr = { type: THREE.HalfFloatType };
+    this.aoOut = new THREE.WebGLRenderTarget(1, 1, hdr);
+    this.ao = new GTAOPass(scene, camera, 1, 1);
+    this.ao.output = GTAOPass.OUTPUT.Default;
+    this.ao.updateGtaoMaterial({ radius: postParams.aoRadius, distanceExponent: 1.6, thickness: 4, distanceFallOff: 1, scale: postParams.aoScale, samples: 16 });
+    this.ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 16 });
     this.target = new THREE.WebGLRenderTarget(1, 1, { ...hdr, samples: 4 });
     this.blurA = new THREE.WebGLRenderTarget(1, 1, hdr);
     this.blurB = new THREE.WebGLRenderTarget(1, 1, hdr);
@@ -123,6 +135,8 @@ export class Post {
   resize() {
     this.renderer.getDrawingBufferSize(this.res);
     this.target.setSize(this.res.x, this.res.y);
+    this.aoOut.setSize(this.res.x, this.res.y);
+    this.ao.setSize(this.res.x, this.res.y);
     const qx = Math.max(1, this.res.x >> 2), qy = Math.max(1, this.res.y >> 2);
     this.blurA.setSize(qx, qy); this.blurB.setSize(qx, qy);
     this.blurC.setSize(Math.max(1, qx >> 2), Math.max(1, qy >> 2)); this.blurD.setSize(Math.max(1, qx >> 2), Math.max(1, qy >> 2));
@@ -138,9 +152,17 @@ export class Post {
     const P = postParams;
     this.renderer.setRenderTarget(this.target);
     this.renderer.render(scene, camera);
+    let src = this.target;
+    if (P.ao) {
+      this.ao.blendIntensity = P.aoIntensity;
+      this.ao.updateGtaoMaterial({ radius: P.aoRadius, scale: P.aoScale });
+      this.ao.render(this.renderer, this.aoOut, this.target);
+      src = this.aoOut;
+    }
+    this.mat.uniforms.tScene.value = src.texture;
     if (P.on) {
       const b = this.blurMat.uniforms;
-      b.tSrc.value = this.target.texture; b.uDir.value.set(1 / this.blurA.width, 0); this.pass(this.blurMat, this.blurA);
+      b.tSrc.value = src.texture; b.uDir.value.set(1 / this.blurA.width, 0); this.pass(this.blurMat, this.blurA);
       b.tSrc.value = this.blurA.texture; b.uDir.value.set(0, 1 / this.blurB.height); this.pass(this.blurMat, this.blurB);
       b.tSrc.value = this.blurB.texture; b.uDir.value.set(1 / this.blurC.width, 0); this.pass(this.blurMat, this.blurC);
       b.tSrc.value = this.blurC.texture; b.uDir.value.set(0, 1 / this.blurD.height); this.pass(this.blurMat, this.blurD);
