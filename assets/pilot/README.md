@@ -20,3 +20,20 @@ procedural part filled, under the spider's own satin material). What we learned:
   had a hollow front end. Render every raw mesh from all sides (front, back, both flanks) before finishing.
 - Spines and bristles widen the bounding box, so `aiPart` fits the 3rd to 97th percentile of the vertices.
 - In use: the abdomen (`img_33_3`). The carapace (`img_45_3`, `?carapace`) still reads glassy next to the face mask.
+
+## Carapace v2 (top-down)
+
+- Paint parts from the angle the game sees them. "Top-down photograph looking straight down ... orthographic top view"
+  works: all 8 concepts came out from above. The v1 three-quarter concepts were lacquered black with orange flecks,
+  which read as glassy amber in game.
+- Colour and finish words matter more than the subject: "warm dark chocolate brown ... matte satin chitin covered in
+  dense short velvety hair, no gloss, no shine, no translucency, no lacquer" took it from amber glass to brown chitin
+  that matches the face mask. The look's `roughness` went from 0.42 to 0.65 as well.
+- The mesher puts a top-down image upright, its dome facing +z and the image's top at +y. In the body frame that is
+  `PART_TURN [-PI/2, 0, PI]` (the Z half-turn brings the image's top, the front, to +z).
+- The mesher invents a pale belly for a shell seen only from above. It closes it (no holes on any of the three), but
+  the pale colour shows as a thin rim at the edge.
+- `tools/rawsides.py` renders a raw mesh from six sides (front, back, both flanks, top, under) on magenta with
+  backface culling, so open sides show as holes: `blender -b -P tools/rawsides.py -- <raw.glb>` writes `<raw>_sides.png`.
+- In use behind `?spider=carapace|both`: `img_77_0` (of `img_61_2`, `img_77_0`, `img_77_2`; `77_2` grew claws at the
+  sides, `61_2` came out thin, with leg stubs).

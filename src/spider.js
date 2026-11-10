@@ -8,9 +8,10 @@ import { model } from './world/models.js';
 // AI-made body parts (assets/pilot/spider_*: concept image, mesh, Blender finish), loaded by main.js before the
 // spider is built (main.js picks which: ?spider=). Each fills the box the procedural part filled; without them the
 // procedural body stays.
-// how each mesh came out of the mesher, turned to the body's frame (up +y, front +z): the carapace was meshed
-// standing up, facing the camera; the abdomen lying turned, its spinnerets off to the front right
-const PART_TURN = { spider_thorax: [-Math.PI / 2, 0, 0], spider_abdomen: [0, 2.49, 0] };
+// how each mesh came out of the mesher, turned to the body's frame (up +y, front +z): the carapace was painted
+// from straight above and meshed standing up, its dome facing the camera and its front at the top of the image;
+// the abdomen lying turned, its spinnerets off to the front right
+const PART_TURN = { spider_thorax: [-Math.PI / 2, 0, Math.PI], spider_abdomen: [0, 2.49, 0] };
 function aiPart(name, size, look) {
   const m = model(name);
   if (!m) return null;

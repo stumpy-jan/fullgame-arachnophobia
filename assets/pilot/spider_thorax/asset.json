@@ -1,12 +1,14 @@
 {
   "title": "Spider cephalothorax",
   "concept": "The body of a giant mutant spider seen from above, a lean low carapace.",
-  "sheet": "Studio product photograph of a single empty crab carapace shell on its own, no legs, no claws, no eyes: a low oval domed shell 1.6 m long and 1.4 m wide, a raised central ridge with a deep pit in the middle, grooves radiating out to a thick rim, coloured dark brown-black like a tarantula, satin lacquered chitin with subtle reddish-brown mottling and a few short stiff bristles. Seen from the front three-quarter above. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "sheet": "Top-down photograph looking straight down from directly overhead at a single empty crab carapace shell lying on its own, no legs, no claws, no eyes: a broad rounded heart-shaped shell 1.6 m long and 1.4 m wide, slightly narrower at the back, a gently raised low dome with a small central pit, soft grooves radiating from the pit to a thick rounded rim. Coloured like a tarantula: warm dark chocolate brown with a slightly darker radiating star pattern and a paler tan edge, matte satin chitin covered in dense short velvety hair, no gloss, no shine, no translucency, no lacquer. Orthographic top view, the shell centred and whole in frame with generous space around it, plain light grey seamless background, soft even overhead studio light, no shadows, no text or logos.",
   "seeds": [
     11,
     23,
     37,
-    59
+    59,
+    61,
+    77
   ],
   "notes": "Budget: 4,000 triangles, 1K maps. Rigid part on the root; the face mask covers its front.",
   "finish": {
@@ -21,7 +23,7 @@
         ]
       }
     },
-    "raw": "raw_img_45_3.glb",
+    "raw": "raw_img_77_0.glb",
     "fit": [
       "x",
       1.6
@@ -40,7 +42,7 @@
           0.007,
           0.006
         ],
-        "roughness": 0.42,
+        "roughness": 0.65,
         "pattern": "pores",
         "scale": 60,
         "bump": 0.12,
@@ -69,6 +71,7 @@
     "thicken_m": 0.006
   },
   "picks": {
-    "sheet": "img_45_3.png"
-  }
+    "sheet": "img_77_0.png"
+  },
+  "sheet_v1": "Studio product photograph of a single empty crab carapace shell on its own, no legs, no claws, no eyes: a low oval domed shell 1.6 m long and 1.4 m wide, a raised central ridge with a deep pit in the middle, grooves radiating out to a thick rim, coloured dark brown-black like a tarantula, satin lacquered chitin with subtle reddish-brown mottling and a few short stiff bristles. Seen from the front three-quarter above. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos."
 }
