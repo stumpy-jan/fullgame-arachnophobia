@@ -67,3 +67,21 @@ The face (`maskFromHead` in `src/spider.js`, cut from the head scan) was a one-s
 down past it from behind, so its back faces were culled and the floor showed through between the chelicerae. It's
 now closed into a solid: a flat back behind the face and a rim stitched round its cut edge. The back and rim get
 projected UVs, because the scan's UVs stretch into streaks down the rim.
+
+## Mutation parts (Devour mandible, Rear quills ridge, Scythes)
+
+Rigid parts that the mutations hang on the spider. `spider.mutationPart(name, box, k)` (in `src/spider.js`) fits
+one to a box, like `aiPart`, and dresses it in the spider's satin. The mutations in `src/mutations.js` (gameplay's
+file) place it, with the procedural part as the fallback. Load them with `loadModels(renderer, [...MUTATION_PARTS])`.
+To preview: `?gym&mut=devour,quills`.
+
+- `maw_mandible` (`img_97_0`, 1,000 tris, mirrored for the other side). Seen from above, the two read as
+  hooked jaws reaching forward from the face. The image model keeps painting a *pair* of jaws: "stag beetle's jaw"
+  gave whole beetle heads, and "fang ... teeth along the inner edge" gave pincers. Borrowing the scythe's wording
+  ("a single short thick curved sickle blade on its own, carved from dark chitin ... side view") gave one blade.
+- `abdomen_quills` (`img_61_0`, 3,000 tris). A top-down plate with two rows of pale quills, laid along the top
+  of the abdomen. The first prompt worked.
+- `foreleg_scythe` (`img_61_0`, 800 tris). A pale bone sickle with a dark socket, along each front tibia. The
+  first prompt worked. `61_3`'s socket came out as an open tube.
+- The finish's `"fit"` takes an axis (`x`, `y` or `z`), not `max`.
+- All three were finished at 8k faces with the thin-shell settings, then cut down with `tools/decimate.py`.

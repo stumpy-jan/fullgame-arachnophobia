@@ -1,0 +1,69 @@
+{
+  "title": "Foreleg scythe",
+  "concept": "Scythes (forelegs mutation, proposed): bone sickle blades growing from the front legs.",
+  "sheet": "Studio product photograph of a single curved bone sickle blade on its own, like a mantis's raptorial blade carved from ivory: a thick dark brown chitin socket at one end, a long slender pale bone blade curving into a hooked point, a serrated inner edge with small backward teeth, side view, no insect, no body. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    61
+  ],
+  "notes": "Budget: 800 triangles, 512 maps. Rigid, on a foreleg's tibia; one mesh for every scythed leg (mirrored).",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_61_0.glb",
+    "fit": [
+      "x",
+      1.1
+    ],
+    "faces": 8000,
+    "budget": 800,
+    "texture": 512,
+    "looks": {
+      "body": {
+        "color": [
+          0.55,
+          0.47,
+          0.36
+        ],
+        "shade": [
+          0.36,
+          0.29,
+          0.2
+        ],
+        "roughness": 0.5,
+        "pattern": "bone",
+        "scale": 40,
+        "bump": 0.1,
+        "texture_color": 1,
+        "cavity": {
+          "color": [
+            0.08,
+            0.05,
+            0.03
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.75,
+            0.68,
+            0.55
+          ],
+          "amount": 0.2,
+          "roughness": 0.4
+        },
+        "metallic": 0
+      }
+    },
+    "thicken_m": 0.004,
+    "shrinkwrap_reach": 0.002
+  }
+}

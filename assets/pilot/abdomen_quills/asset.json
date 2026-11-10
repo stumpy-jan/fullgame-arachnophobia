@@ -1,0 +1,70 @@
+{
+  "title": "Rear quills ridge",
+  "concept": "Rear quills (abdomen mutation): a ridge of pale bone quills over the abdomen that fire at anyone behind.",
+  "sheet": "Top-down photograph looking straight down at a single low oval shell plate lying on its own, dark chocolate-brown matte chitin, with two rows of long pale ivory bone quills growing out of it along its length, every quill raking back towards the same narrow end, sharp tips, no animal, no head, no legs. A single object alone, whole object in frame with generous space around it, plain light grey seamless background, soft even studio light, no floor, no shadows, no text or logos.",
+  "seeds": [
+    61
+  ],
+  "notes": "Budget: 3,000 triangles, 1K maps. Rigid, on the abdomen mount, over the top and back of the abdomen.",
+  "finish": {
+    "zones": {
+      "body": {
+        "samples": [
+          [
+            128,
+            128,
+            128
+          ]
+        ]
+      }
+    },
+    "raw": "raw_img_61_0.glb",
+    "fit": [
+      "x",
+      1.9
+    ],
+    "faces": 8000,
+    "budget": 3000,
+    "texture": 1024,
+    "looks": {
+      "body": {
+        "color": [
+          0.03,
+          0.018,
+          0.014
+        ],
+        "shade": [
+          0.012,
+          0.007,
+          0.006
+        ],
+        "roughness": 0.65,
+        "pattern": "pores",
+        "scale": 60,
+        "bump": 0.12,
+        "texture_color": 1,
+        "sheen": 0.3,
+        "cavity": {
+          "color": [
+            0.004,
+            0.002,
+            0.002
+          ],
+          "amount": 0.5
+        },
+        "edge": {
+          "color": [
+            0.09,
+            0.04,
+            0.025
+          ],
+          "amount": 0.2,
+          "roughness": 0.3
+        },
+        "metallic": 0
+      }
+    },
+    "thicken_m": 0.004,
+    "shrinkwrap_reach": 0.002
+  }
+}
