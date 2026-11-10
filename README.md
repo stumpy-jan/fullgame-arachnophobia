@@ -74,6 +74,16 @@ URL switches: `?auto` autopilot, `?autoattack` strike whenever possible, `?god` 
 `node tools/shot.mjs "<query>" <name> <t1,t2,...>` drives headless Edge against the dev server and saves
 `shots/<name>_<t>.png` at those game times (the game steps a fixed 1/60 s with `?shot`, so they repeat).
 
+## Attachment check
+
+The spider changes with every mutation, so parts never sit at fixed numbers. Sockets (`spider.mounts`) are measured
+from the body actually built (the thorax or AI shell; the face mask, seated on it when it loads; the mouth at the
+mask's chin), AI parts anchor at their root (`aiPart` / `mutationPart` take an anchor), and `spider.joints()` lists
+what every part hangs from. The legs keep out of the body: after the IK, a knee swings round the hip-ankle line
+until the leg clears every body part (ellipsoids fitted to each part's own vertices, so new parts count too).
+
+    node tools/attachcheck.mjs [seconds] [versions] [mutations;...]   # gap per joint, legs-in-body per version
+
 ## Leg clipping check
 
 `node tools/clipcheck.mjs [seconds]` runs the autopilot headless and reports the share of frames in which any

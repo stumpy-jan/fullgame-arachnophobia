@@ -103,6 +103,12 @@ Sprinter, Leaper. Glands: Acid trail, Web trail.
 - A run is framed: a loading veil (nothing pops in), the title over the start bay, pause and settings, a summary
   at the end. The HUD is quiet: icons for the slots (tooltips), a prompt only when there's something to do.
 
+## Rule: parts attach to the body that is there
+
+Every part hangs from a socket measured from the current body, anchored at its root, and is listed in
+`spider.joints()`; the legs swing their knees clear of every body part. `tools/attachcheck.mjs` must report
+"all joints attached" and low legs-in-body numbers for every spider version and mutation before a part ships.
+
 ## Open questions
 
 - Facing: confirm "movement direction while moving, mouse when slow".

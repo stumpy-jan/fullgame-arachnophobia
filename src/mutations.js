@@ -17,8 +17,8 @@ export const MUTATIONS = {
       for (const f of sp.fangs) f.visible = false;
       const g = new THREE.Group();
       for (const s of [-1, 1]) {
-        const m = new THREE.Group(); m.position.set(s * 0.2, -0.08, 1.02); g.add(m);
-        const ai = sp.mutationPart('maw_mandible', MANDIBLE.size, MANDIBLE.k); // (the AI part when loaded: assets/pilot/maw_mandible)
+        const m = new THREE.Group(); m.position.set(s * 0.15, 0, -0.04); g.add(m); // (each jaw's root, under the chin: the maw socket)
+        const ai = sp.mutationPart('maw_mandible', MANDIBLE.size, MANDIBLE.k, MANDIBLE.anchor); // (the AI part when loaded: assets/pilot/maw_mandible)
         if (ai) {
           ai.scale.x *= s; ai.position.set(...MANDIBLE.pos); ai.position.x *= s; ai.rotation.set(MANDIBLE.tilt, s * MANDIBLE.turn, 0);
           m.add(ai); sp.mawJaws.push(m); continue;
@@ -130,7 +130,8 @@ export const MUTATIONS = {
 };
 
 // AI part placement (assets/pilot; spider.mutationPart fits each to its box): box (m), where its centre goes, tilt
-const MANDIBLE = { size: new THREE.Vector3(0.36, 0.16, 1.0), pos: [0.06, -0.02, 0.48], tilt: 0.15, turn: 0.2, k: 0.6 };
+// (mandibles anchor at their root, the back of their box, so they start at the socket whatever their length)
+const MANDIBLE = { size: new THREE.Vector3(0.34, 0.16, 0.85), anchor: [0, 0.6, -1], pos: [0, 0, -0.1], tilt: 0.3, turn: 0.15, k: 0.6 };
 const QUILLS = { size: new THREE.Vector3(1.1, 0.34, 1.9), pos: [0, 0.66, -0.1], tilt: 0.12, k: 1.15 };
 const SCYTHE = { size: new THREE.Vector3(0.14, 1.9, 0.6), pos: [0, 1.2, 0.18], k: 1.25 };
 

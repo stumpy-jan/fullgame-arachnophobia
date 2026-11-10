@@ -19,7 +19,7 @@ const PART_TURN = {
 };
 // the mutation parts (spider.mutationPart): which mutation each is for is up to mutations.js
 export const MUTATION_PARTS = ['maw_mandible', 'abdomen_quills', 'foreleg_scythe'];
-function aiPart(name, size, look) {
+function aiPart(name, size, look, anchor = [0, 0, 0]) {
   const m = model(name);
   if (!m) return null;
   m.rotation.set(...(PART_TURN[name] || [0, 0, 0]));
@@ -36,7 +36,7 @@ function aiPart(name, size, look) {
   });
   const span = (arr) => { arr.sort((p, q) => p - q); const lo = arr[Math.floor(arr.length * 0.03)], hi = arr[Math.floor(arr.length * 0.97)]; return [hi - lo, (hi + lo) / 2]; };
   const [sx, cx] = span(xs), [sy, cy] = span(ys), [sz, cz] = span(zs);
-  m.position.set(-cx, -cy, -cz);
+  m.position.set(-(cx + (anchor[0] * sx) / 2), -(cy + (anchor[1] * sy) / 2), -(cz + (anchor[2] * sz) / 2));
   g.scale.set(size.x / sx, size.y / sy, size.z / sz);
   return g;
 }
@@ -83,6 +83,32 @@ const STRIKE_REACH = 5.8; // m from the hip
 // the face mask: placement on the body (pos, tilt up), size (scan units -> m), eye sockets (scan units,
 // after maskFromHead's recentring) and eye radius (scan units)
 const MASK = { pos: [0, 0.2, 0.92], tilt: -0.9, scale: 1.25 / 6.4, eye: [0.484, -0.09, 1.56], eyeR: 0.23 };
+const MAW_GUESS = [0, 0.26, 1.1];
+// knee swings tried (rad, signed so positive is outward-and-up on either side), nearest first
+const SWIVELS = [0.2, -0.2, 0.4, -0.4, 0.65, -0.65, 0.9, -0.9, 1.2, 1.5];
+const _BP = new THREE.Vector3(), _BQ = new THREE.Quaternion(), _BL = new THREE.Vector3(), _BK = new THREE.Vector3(), _BA = new THREE.Vector3(), _BR = new THREE.Quaternion();
+// the knee turned by angle a about the hip -> ankle line
+// vertices of some objects (their visible meshes, every k-th), in the frame of `frame` (or the world)
+function sampleVerts(objs, cap, frame = null) {
+  const out = [], inv = frame ? new THREE.Matrix4().copy(frame.matrixWorld).invert() : null;
+  for (const o of objs) o.traverseVisible((q) => {
+    if (!q.isMesh || q.material.visible === false) return;
+    const pos = q.geometry.attributes.position, step = Math.max(1, Math.floor(pos.count / cap));
+    for (let i = 0; i < pos.count; i += step) {
+      const v = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(q.matrixWorld);
+      if (inv && isUnder(q, frame)) v.applyMatrix4(inv); // (parts under the frame: into its frame; loose ones are in it already)
+      out.push(v);
+    }
+  });
+  return out;
+}
+const isUnder = (o, p) => { for (let q = o.parent; q; q = q.parent) if (q === p) return true; return false; };
+function nearest(A, B) { let best = Infinity; for (const a of A) for (const b of B) { const d = a.distanceToSquared(b); if (d < best) best = d; } return Math.sqrt(best); }
+function swivel(hip, ankle, knee, a, out) {
+  _BA.subVectors(ankle, hip).normalize();
+  _BR.setFromAxisAngle(_BA, a);
+  return out.copy(knee).sub(hip).applyQuaternion(_BR).add(hip);
+} // (where the mask's chin will be, until it has loaded)
 const FEMUR = 2.6, TIBIA = 2.6, META = 1.3, META_TILT = 0.22, REACH = FEMUR + TIBIA;
 
 export class Spider {
@@ -131,14 +157,24 @@ export class Spider {
 
     // cephalothorax (forward is +z): lean and low
     this.thorax = add(this.root, lump(0.05, 4, 1), chitin, 0, 0, 0.18, 0.72, 0.4, 0.8); // (its front pulled back: the mask is the front of the head)
-    const hump = add(this.root, lump(0.06, 5, 2), chitin, 0, 0.22, 0.32, 0.44, 0.24, 0.6); // the raised carapace hump
+    const hump = this.hump = add(this.root, lump(0.06, 5, 2), chitin, 0, 0.22, 0.32, 0.44, 0.24, 0.6); // the raised carapace hump
     const baked = (k) => (o) => satin({ map: o.map, normal: o.normalMap, rough: o.roughnessMap }, { color: new THREE.Color(k, k * 0.9, k * 0.85), roughness: 1, normalScale: new THREE.Vector2(1, 1) });
-    const shell = aiPart('spider_thorax', new THREE.Vector3(1.5, 0.6, 1.55), baked(0.55));
+    const shell = this.shell = aiPart('spider_thorax', new THREE.Vector3(1.5, 0.6, 1.55), baked(0.55));
     if (shell) { // the generated carapace replaces both lumps
       shell.position.set(0, 0.1, 0.16); this.root.add(shell);
       this.thorax.visible = hump.visible = false;
       shell.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
     }
+    // body slots (Design/DESIGN.md): mutations hang their parts on these sockets (or on the legs, by pair). They're
+    // measured from the body actually built (procedural lumps or the AI carapace; the face mask, which loads later),
+    // never fixed numbers: parts have to touch whatever body the spider has. tools/attachcheck.mjs checks every joint.
+    this.mounts = { maw: new THREE.Group(), carapace: new THREE.Group(), abdomen: new THREE.Group(), glands: new THREE.Group() };
+    this.root.add(this.mounts.maw, this.mounts.carapace);
+    { // the carapace socket: the top of the thorax that's showing, a little sunk in
+      const b = new THREE.Box3().setFromObject(shell || hump, true);
+      this.mounts.carapace.position.set(0, b.max.y - 0.06, (b.min.z + b.max.z) / 2);
+    }
+    this.mounts.maw.position.set(...MAW_GUESS); // (the chin of the face mask: set exactly once the mask has loaded)
     // the face: a mask grown out of its own chitin over the front of the carapace (loadMask), two eyes in it
     this.maskMat = satin(chitinTextures(73, [92, 74, 64]), { normalScale: new THREE.Vector2(0.35, 0.35) }); // smoother: carved, not hairy
     this.eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x030102, emissive: 0xff1806, emissiveIntensity: 0.22, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02 });
@@ -148,8 +184,8 @@ export class Spider {
     this.fangs = [];
     for (const s of [-1, 1]) {
       const g = new THREE.Group();
-      g.position.set(s * 0.19, -0.05, 1.05);
-      this.root.add(g);
+      g.position.set(s * 0.15, 0, -0.06); // (under the chin: the maw socket)
+      this.mounts.maw.add(g);
       add(g, sphere, chitin, 0, -0.1, 0.1, 0.16, 0.28, 0.19);
       const fang = add(g, new THREE.ConeGeometry(0.06, 0.42, 10), legMat, 0, -0.4, 0.2);
       fang.rotation.x = 0.5;
@@ -159,23 +195,21 @@ export class Spider {
     this.abPivot = new THREE.Group();
     this.abPivot.position.set(0, 0.1, -0.6);
     this.root.add(this.abPivot);
-    add(this.abPivot, sphere, chitin, 0, 0.03, -0.2, 0.3, 0.26, 0.32); // pedicel
+    this.pedicel = add(this.abPivot, sphere, chitin, 0, 0.03, -0.2, 0.3, 0.26, 0.32); // pedicel
     this.abdomen = add(this.abPivot, lump(0.05, 4, 5), this.abMat, 0, 0.18, -1.15, 0.78, 0.62, 1.05);
     this.abdomen.rotation.x = -0.15;
     const sac = aiPart('spider_abdomen', new THREE.Vector3(2, 2, 2), baked(2.6)); // (fills the unit sphere's box: the abdomen's scale still sizes and breathes it)
     if (sac) { this.abdomen.material = new THREE.MeshBasicMaterial({ visible: false }); this.abdomen.castShadow = false; this.abdomen.add(sac); }
     this.abBase = this.abdomen.scale.clone();
     // spinnerets
-    add(this.abPivot, new THREE.ConeGeometry(0.1, 0.26, 10), chitin, 0, 0.05, -2.2).rotation.x = -Math.PI / 2 - 0.4;
+    this.spinnerets = add(this.abPivot, new THREE.ConeGeometry(0.1, 0.26, 10), chitin, 0, 0.05, -2.2);
+    this.spinnerets.rotation.x = -Math.PI / 2 - 0.4;
 
     // body slots (Design/DESIGN.md): mutations hang their parts on these mounts (or on the legs, by pair)
     this.mat = { chitin, leg: legMat, abdomen: this.abMat };
     // an AI mutation part (assets/pilot, MUTATION_PARTS), fitted to a box (its core: see aiPart) and dressed in the
     // spider's satin over its baked maps, k its brightness; null until loaded (loadModels with MUTATION_PARTS)
-    this.mutationPart = (name, size, k = 0.55) => aiPart(name, size, baked(k));
-    this.mounts = { maw: new THREE.Group(), carapace: new THREE.Group(), abdomen: new THREE.Group(), glands: new THREE.Group() };
-    this.root.add(this.mounts.maw, this.mounts.carapace);
-    this.mounts.carapace.position.set(0, 0.3, 0.3);
+    this.mutationPart = (name, size, k = 0.55, anchor) => aiPart(name, size, baked(k), anchor);
     this.abPivot.add(this.mounts.abdomen, this.mounts.glands);
     this.mounts.abdomen.position.set(0, 0.18, -1.15);
     this.mounts.glands.position.set(0, 0.05, -2.2);
@@ -213,6 +247,101 @@ export class Spider {
     }
   }
 
+  // ---------------------------------------------------------------- joints
+  // What every part hangs from: [name, part, hosts]. tools/attachcheck.mjs measures the gap between each part and
+  // its hosts on every spider version and mutation, so a part that floats (or a socket left behind when the body
+  // changes) shows up as a number, not in a screenshot. Mutation parts are found by where they hang (a socket, a
+  // leg segment), so new mutations are covered without being listed here.
+  joints() {
+    const thorax = this.shell ? [this.shell] : [this.thorax, this.hump];
+    const head = this.mask ? [this.mask, ...thorax] : thorax;
+    const side = (l) => `${l.k}${l.s > 0 ? 'R' : 'L'}`;
+    const J = [];
+    if (this.mask) J.push(['face mask', this.mask, thorax]);
+    J.push(['pedicel', this.pedicel, thorax], ['abdomen', this.abdomen, [this.pedicel]], ['spinnerets', this.spinnerets, [this.abdomen]]);
+    for (const l of this.legs) J.push([`hip ${side(l)}`, l.hipBall, thorax]);
+    // (the maw hangs from the mouth, under the face: the mask, not the rim of the shell)
+    const hosts = { maw: this.mask ? [this.mask] : thorax, carapace: thorax, abdomen: [this.abdomen], glands: [this.abdomen] };
+    this.fangs.forEach((f, i) => { if (f.visible && f.parent !== this.mounts.maw) J.push(['fang ' + i, f, hosts.maw]); });
+    for (const [slot, mount] of Object.entries(this.mounts)) {
+      for (const c of mount.children) {
+        if (!c.visible) continue; // (a part swapped out: the fangs under Devour)
+        const parts = !c.isMesh && c.children.length > 1 && c.children.every((x) => !x.isMesh) ? c.children : [c]; // (a pair: each on its own)
+        parts.forEach((q, i) => J.push([`${slot}: ${q.name || 'part'} ${parts.length > 1 ? i : ''}`, q, hosts[slot]]));
+      }
+    }
+    for (const l of this.legs) for (const seg of ['femur', 'tibia', 'meta']) for (const c of l[seg].children) J.push([`${seg} ${side(l)}: ${c.name || 'part'}`, c, [l[seg]]]);
+    return J;
+  }
+
+  // The body as the legs see it: one ellipsoid per visible body mesh (the thorax or shell, the mask, the pedicel,
+  // the abdomen, every part hung on a socket), fitted to the inner 94% of its vertices in its own frame (spines and
+  // bristles don't count), so it follows the body as mutations change it. Rebuilt when a part is added or removed.
+  bodyShapes() {
+    const key = Object.values(this.mounts).map((m) => m.children.length).join() + !!this.mask + !!this.shell;
+    if (this._shapes && this._shapesKey === key) return this._shapes;
+    const shapes = [], thorax = this.shell ? [this.shell] : [this.thorax, this.hump];
+    const named = [['thorax', thorax], ['mask', this.mask ? [this.mask] : []], ['pedicel', [this.pedicel]], ['abdomen', [this.abdomen]]];
+    for (const [slot, m] of Object.entries(this.mounts)) named.push([slot + ' part', m.children]);
+    for (const [name, objs] of named) for (const o of objs) o.traverse((q) => {
+      if (!q.isMesh || q.material.visible === false) return;
+      const g = q.geometry;
+      if (!g.userData.core) { // percentiles of its vertices on each axis
+        const pos = g.attributes.position, ax = [[], [], []];
+        for (let i = 0; i < pos.count; i++) { ax[0].push(pos.getX(i)); ax[1].push(pos.getY(i)); ax[2].push(pos.getZ(i)); }
+        const lo = [], hi = [];
+        for (const k of [0, 1, 2]) { ax[k].sort((x, y) => x - y); lo.push(ax[k][Math.floor(ax[k].length * 0.03)]); hi.push(ax[k][Math.floor(ax[k].length * 0.97)]); }
+        g.userData.core = { c: new THREE.Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2), h: new THREE.Vector3((hi[0] - lo[0]) / 2, (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2) };
+      }
+      shapes.push({ name, mesh: q, core: g.userData.core, inv: new THREE.Matrix4(), sc: new THREE.Vector3() });
+    });
+    this._shapes = shapes; this._shapesKey = key;
+    return shapes;
+  }
+  // once a frame, before the legs are posed: where each body ellipsoid is now
+  prepBody() {
+    this.root.updateMatrixWorld(true);
+    for (const S of this.bodyShapes()) { S.inv.copy(S.mesh.matrixWorld).invert(); S.mesh.matrixWorld.decompose(_BP, _BQ, S.sc); }
+  }
+  // how deep a ball (centre P, radius r) is inside the body: [depth in m, shape]; depth <= 0 is clear
+  inBody(P, r) {
+    let best = -9, who = null;
+    for (const S of this._shapes || []) {
+      _BL.copy(P).applyMatrix4(S.inv).sub(S.core.c);
+      const hx = S.core.h.x * Math.abs(S.sc.x), hy = S.core.h.y * Math.abs(S.sc.y), hz = S.core.h.z * Math.abs(S.sc.z);
+      const n = Math.hypot((_BL.x * Math.abs(S.sc.x)) / hx, (_BL.y * Math.abs(S.sc.y)) / hy, (_BL.z * Math.abs(S.sc.z)) / hz);
+      const d = (1 - n) * Math.min(hx, hy, hz) + r;
+      if (d > best) { best = d; who = S; }
+    }
+    return [best, who];
+  }
+  // a leg against the body: the deepest of its femur (past the hip socket, where it rightly goes in) and tibia
+  legInBody(hip, knee, ankle) {
+    let best = -9, who = null, seg = '';
+    for (const [name, a, b, r, from] of [['femur', hip, knee, 0.15, 0.3], ['tibia', knee, ankle, 0.1, 0]]) {
+      for (let i = 0; i <= 5; i++) {
+        const [d, S] = this.inBody(_BP.lerpVectors(a, b, from + ((1 - from) * i) / 5), r);
+        if (d > best) { best = d; who = S; seg = name; }
+      }
+    }
+    return [best, who, seg];
+  }
+  // would this femur and tibia go into the world (walls, props)? (for the knee swing: it mustn't trade one clip for another)
+  legInWorld(hip, knee, ankle) {
+    const H = this.world.heightAt;
+    for (const [a, b] of [[hip, knee], [knee, ankle]]) for (let i = 1; i <= 4; i++) { _BP.lerpVectors(a, b, i / 4); if (_BP.y < H(_BP.x, _BP.z) + 0.05) return true; }
+    return false;
+  }
+  // measurement (?bodycheck, tools/attachcheck.mjs): the deepest leg in the body right now
+  legIntrusion() {
+    let best = { depth: 0, part: null, seg: null };
+    for (const l of this.legs) {
+      const [d, S, seg] = this.legInBody(l.j[0], l.j[1], l.j[2]);
+      if (d > best.depth) best = { depth: d, part: S?.name, seg: `${seg} ${l.k}${l.s > 0 ? 'R' : 'L'}` };
+    }
+    return best;
+  }
+
   // ---------------------------------------------------------------- the face
   // The upper half of a human face (a head scan, see CREDITS.md), cut out, softened and set into the front
   // of the carapace, tilted up towards the camera: the creature's own chitin in the shape of a face, two
@@ -236,6 +365,14 @@ export class Spider {
         e.scale.set(MASK.eyeR, MASK.eyeR * 0.8, MASK.eyeR * 0.7);
         mesh.add(e);
       }
+      // seat it on the thorax that's there: back along -z until it touches (its numbers were set on one body)
+      g.updateMatrixWorld(true);
+      const thorax = this.shell ? [this.shell] : [this.thorax, this.hump];
+      for (const o of thorax) o.updateWorldMatrix(true, true);
+      const tv = sampleVerts(thorax, 3000, this.root);
+      for (let i = 0; i < 30 && nearest(sampleVerts([g], 500), tv) > 0.015; i++) { g.position.z -= 0.01; g.updateMatrixWorld(true); }
+      const b = new THREE.Box3().setFromObject(g, true); // (in the root's frame: g has no parent yet)
+      this.mounts.maw.position.set(0, b.min.y + 0.04, b.max.z - 0.2); // the chin, a little in under it
       this.root.add(g);
       this.mask = g;
     });
@@ -594,6 +731,7 @@ export class Spider {
     for (const [i, f] of this.fangs.entries()) f.rotation.x = Math.sin(this.time * 6 + i * 2.1) * 0.12 * (0.4 + fast);
 
     // --- legs: pose the meshes
+    this.prepBody();
     for (const l of this.legs) this.pose(l);
   }
 
@@ -745,6 +883,22 @@ export class Spider {
     const [hip, knee, ankle] = l.j;
     this.hipWorld(l, hip);
     this.solve(hip, l.foot, knee, ankle, l.air);
+    // keep out of the body: a two-bone leg can swing its knee round the hip-ankle line without moving the foot,
+    // so if the leg would pass through any part of the body (whatever parts it has now), swing the knee up and
+    // out until it clears; eased, so it doesn't pop
+    let want = 0;
+    if (this.avoidBody !== false && this._shapes && this.legInBody(hip, knee, ankle)[0] > 0.02) {
+      let bestD = 9;
+      for (const a of SWIVELS) {
+        swivel(hip, ankle, knee, a * l.s, _BK);
+        if (this.legInWorld(hip, _BK, ankle)) continue; // (not into a wall instead)
+        const d = this.legInBody(hip, _BK, ankle)[0];
+        if (d < bestD - 0.01) { bestD = d; want = a; }
+        if (d <= 0.02) break;
+      }
+    }
+    l.swivel = (l.swivel || 0) + (want - (l.swivel || 0)) * 0.5;
+    if (Math.abs(l.swivel) > 1e-3) swivel(hip, ankle, knee, l.swivel * l.s, knee);
     seg(l.femur, hip, knee);
     seg(l.tibia, knee, ankle);
     seg(l.meta, ankle, l.foot);

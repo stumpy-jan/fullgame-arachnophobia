@@ -59,6 +59,7 @@ const lab = buildWorld(scene, GYM ? makeGymLayout() : Q.has('lab') ? makeLabLayo
 console.log('facility seed', SEED, lab.layout.info || '');
 const spider = new Spider(scene, lab);
 spider.place(lab.spawn.x, lab.spawn.z, lab.spawn.heading);
+if (Q.has('noavoid')) spider.avoidBody = false; // (legs pass through the body: for measuring)
 if (Q.get('at')) { const [x, z, h] = Q.get('at').split(',').map(Number); spider.place(x, z, h || 0); }
 
 // the people (?nopeople: an empty lab), effects, the game's state
@@ -223,6 +224,7 @@ function endRun(escaped) {
 }
 
 // ?measure: leg / body clipping into obstacles, every frame (tools/clipcheck.mjs reads window.game.clip)
+const bodyClip = Q.has('bodycheck') ? { frames: 0, bad: 0, max: 0, maxAt: '', by: {} } : null;
 const clip = Q.has('measure') ? { frames: 0, bad: 0, deep: 0, max: 0, maxAt: 0, legFrames: 0, worst: [], kinds: {} } : null;
 function measureClip() {
   const r = spider.clipStats();
@@ -332,6 +334,11 @@ function frame(now) {
     time += dt;
     spider.update(dt, readInput());
     if (clip) measureClip();
+    if (bodyClip) { // ?bodycheck: legs into the body, every frame (tools/attachcheck.mjs)
+      const r = spider.legIntrusion(); bodyClip.frames++;
+      if (r.depth > 0.05) { bodyClip.bad++; const k = r.part + ' / ' + r.seg.split(' ')[0]; bodyClip.by[k] = (bodyClip.by[k] || 0) + 1; }
+      if (r.depth > bodyClip.max) { bodyClip.max = r.depth; bodyClip.maxAt = r.part + ' / ' + r.seg; }
+    }
     if (people && !state.over) {
       // feeding: hold F over a corpse (fast heal, no attacks); otherwise the slash, automatically
       const mouth = new THREE.Vector3(0, 0, 1.8).applyMatrix4(spider.root.matrixWorld);
@@ -412,4 +419,4 @@ if (mode === 'title') showTitle(); else hud.show(true);
 setTimeout(() => menu.reveal(), 120);
 
 // for tools and the console
-window.game = { seed: SEED, spill, damage, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };
+window.game = { bodyClip, seed: SEED, spill, damage, spider, lab, people, fx, state, mutations, pick, camera, postParams, CAM, renderer, clip, get time() { return time; } };
