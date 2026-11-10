@@ -163,6 +163,17 @@ export function cabinet(ctx, { x, z, w = 2.6, h = 2.3, d = 1.2, mat = 'cabinet' 
   ctx.block(x, z, w, h, d, ctx.M[mat]);
 }
 
+// The AI tank parts (assets/pilot: tank_lid, specimen), when loaded: a model scaled to a radius (its
+// FIT diameter is 2 m) and, if given, a height; null without them (the procedural part stays).
+function tankPart(ctx, name, x, y, z, r, height = 0) {
+  const m = model(name);
+  if (!m) return null;
+  m.scale.set(r, height ? height / m.userData.size.y : r, r);
+  m.position.set(x, y, z);
+  ctx.root.add(m);
+  return m;
+}
+
 // A containment tank: glass cylinder of glowing fluid on a steel collar; or the broken one, with its
 // shards, its cap thrown aside and the ooze trail of what came out of it.
 export function tank(ctx, { x, z, broken = false }) {
@@ -173,7 +184,7 @@ export function tank(ctx, { x, z, broken = false }) {
   if (!broken) {
     ctx.mesh(cylGeo(r, r, h, 40, 1, true), M.glass, x, 0.45 + h / 2, z, { cast: false });
     ctx.mesh(cylGeo(r - 0.06, r - 0.06, h * 0.8, 40), M.fluid, x, 0.45 + h * 0.4, z, { cast: false });
-    ctx.mesh(cylGeo(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x, 0.45 + h + 0.175, z);
+    if (!tankPart(ctx, 'tank_lid', x, 0.45 + h - 0.05, z, r + 0.2)) ctx.mesh(cylGeo(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x, 0.45 + h + 0.175, z);
     ctx.solidDisc(x, z, r + 0.2, 0.45 + h + 0.35);
     ctx.blocker({ x0: x - r, x1: x + r, z0: z - r, z1: z + r, top: 0.45 + h + 0.35 });
     ctx.light(new THREE.PointLight(0x7dff3a, 22, 9, 2), x, 1.6, z);
@@ -182,7 +193,7 @@ export function tank(ctx, { x, z, broken = false }) {
       const a = (i / 14) * Math.PI * 2 + R() * 0.2, hh = 0.2 + R() * R() * 1.6;
       ctx.mesh(cylGeo(r, r, hh, 4, 1, true, a, 0.35 + R() * 0.15), M.glass, x, 0.45 + hh / 2, z, { cast: false });
     }
-    const cap = ctx.mesh(cylGeo(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x + 3.6, 0.5, z - 1.5);
+    const cap = tankPart(ctx, 'tank_lid', x + 3.6, 0.5, z - 1.5, r + 0.2) || ctx.mesh(cylGeo(r + 0.18, r + 0.18, 0.35, 40), M.darkSteel, x + 3.6, 0.5, z - 1.5);
     cap.rotation.set(0.35, 0, 0.9);
     ctx.solidDisc(x, z, r + 0.3, 0.45);
     const oz = ctx.mesh(splat(R, 1, 0.35), M.ooze, x + 0.6, 0.006, z + 1.2, { cast: false });
@@ -349,10 +360,15 @@ export function vat(ctx, { x, z }) {
   const add = (geo, mat, y, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = cast; m.receiveShadow = true; g.add(m); return m; };
   add(cylGeo(0.92, 1.0, 0.35, 32), M.darkSteel, 0.175);
   const glass = add(cylGeo(0.75, 0.75, 1.8, 32, 1, true), M.glass, 0.35 + 0.9, false);
-  const fluid = add(cylGeo(0.7, 0.7, 1.45, 32), new THREE.MeshStandardMaterial({ color: 0x4a1236, emissive: 0xff3aa8, emissiveIntensity: 0.55, roughness: 0.2, transparent: true, opacity: 0.8 }), 0.35 + 0.73, false);
-  const organ = add(new THREE.SphereGeometry(1, 24, 18), new THREE.MeshStandardMaterial({ color: 0xb05a6a, emissive: 0x501020, emissiveIntensity: 0.5, roughness: 0.45 }), 1.25, false);
-  organ.scale.set(0.3, 0.42, 0.26);
-  const cap = add(cylGeo(0.85, 0.85, 0.22, 32), M.darkSteel, 2.26);
+  const fluid = add(cylGeo(0.7, 0.7, 1.45, 32), new THREE.MeshStandardMaterial({ color: 0x4a1236, emissive: 0xff3aa8, emissiveIntensity: 0.3, roughness: 0.2, transparent: true, opacity: 0.42, depthWrite: false }), 0.35 + 0.73, false);
+  let organ = tankPart(ctx, 'specimen', 0, 0.62, 0, 0.95);
+  if (organ) { // lit from within, as the procedural organ was (its own colours glowing through the fluid)
+    organ.traverse((o) => { if (o.isMesh) { o.material.emissive.setRGB(1, 1, 1); o.material.emissiveMap = o.material.map; o.material.emissiveIntensity = 0.35; } });
+    g.add(organ); organ.rotation.y = x * 7.3; // (a turn per vat)
+  }
+  else { organ = add(new THREE.SphereGeometry(1, 24, 18), new THREE.MeshStandardMaterial({ color: 0xb05a6a, emissive: 0x501020, emissiveIntensity: 0.5, roughness: 0.45 }), 1.25, false); organ.scale.set(0.3, 0.42, 0.26); }
+  let cap = tankPart(ctx, 'tank_lid', 0, 2.12, 0, 0.9);
+  if (cap) g.add(cap); else cap = add(cylGeo(0.85, 0.85, 0.22, 32), M.darkSteel, 2.26);
   const light = { intensity: 12 }; // (its glow: a pooled PointLight, world.js)
   ctx.glows.push({ x, y: 1.3, z, ref: light });
   ctx.contact(x, z, 2, 2, true);

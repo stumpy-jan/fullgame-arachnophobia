@@ -49,7 +49,7 @@ scene.fog = new THREE.FogExp2(0x030506, 0.012);
 const VERSIONS = { procedural: 'Procedural', abdomen: 'AI abdomen', carapace: 'AI carapace', both: 'AI both' };
 const VERSION_PARTS = { procedural: [], abdomen: ['spider_abdomen'], carapace: ['spider_thorax'], both: ['spider_abdomen', 'spider_thorax'] };
 const version = VERSIONS[Q.get('spider')] ? Q.get('spider') : Q.has('classic') ? 'procedural' : 'both';
-await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version], ...(Q.has('nogear') ? [] : GEAR_MODELS), ...MUTATION_PARTS]); // (the soldiers' AI-made hood, tank and rifle; ?nogear: procedural)
+await loadModels(renderer, ['generator', 'hazmat_locker', 'centrifuge', 'lab_trolley', ...VERSION_PARTS[version], ...(Q.has('nogear') ? [] : GEAR_MODELS), ...MUTATION_PARTS, 'tank_lid', 'specimen']); // (the soldiers' AI-made hood, tank and rifle; ?nogear: procedural)
 // ?gym: an obstacle course with nobody in it, for moving the spider around (world/gym.js)
 const GYM = Q.has('gym');
 if (GYM) audioOpts.siren = false;
